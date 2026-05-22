@@ -1,0 +1,21 @@
+[
+    {
+        "guid": "07caef58-a94b-4211-a62c-f9774e04ebdb",
+        "name": "Simkl (real-time scrobbling)",
+        "description": "Scrobble your watched Movies, TV Shows and Anime to Simkl in real time. Reports start, pause and stop as you watch, shows the title in your Simkl 'Watching now' banner, and marks items watched automatically once you stop past 80%.",
+        "overview": "Real-time Simkl scrobbling for Jellyfin",
+        "owner": "romskidd",
+        "category": "General",
+        "imageUrl": "",
+        "versions": [
+            {
+                "version": "9.0.0.0",
+                "changelog": "Add real-time playback scrobbling: start / pause / stop lifecycle with the live 'Watching now' banner and automatic watched-marking at 80%.",
+                "targetAbi": "10.11.7.0",
+                "sourceUrl": "https://github.com/romskidd/jellyfin-plugin-simkl/releases/download/v9.0.0/simkl_9.0.0.0.zip",
+                "checksum": "3276bbe7dbd66ee2a17c271be391a63f",
+                "timestamp": "2026-05-22T00:00:00Z"
+            }
+        ]
+    }
+]
