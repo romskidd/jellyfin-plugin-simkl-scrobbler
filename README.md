@@ -3,7 +3,7 @@
 
 ###
 
-##Repo for Jellyfin
+## Repo for Jellyfin
 https://raw.githubusercontent.com/romskidd/jellyfin-plugin-simkl/master/manifest.json
 
 ###
