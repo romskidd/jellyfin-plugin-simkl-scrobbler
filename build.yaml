@@ -1,7 +1,7 @@
 ---
 name: "Simkl"
 guid: "07CAEF58-A94B-4211-A62C-F9774E04EBDB"
-version: 8
+version: 9
 targetAbi: "10.11.7.0"
 framework: "net9.0"
 owner: "crobibero"
@@ -13,6 +13,10 @@ category: "General"
 artifacts:
   - "Jellyfin.Plugin.Simkl.dll"
 changelog: |-
+  - Add real-time playback scrobbling: start / pause / stop lifecycle with the live
+    "Watching now" banner and automatic watched-marking at 80% (server-side), per the
+    Simkl scrobble guide. Replaces the previous one-shot progress polling.
+  - Add "Real-time scrobbling" toggle and a "Minimum runtime" option to the settings page.
   - Fix invalid operation exception (#59) @balciseri
   - Revert "Update dependency Microsoft.Extensions.Http to v10" (#54) @Shadowghost
 

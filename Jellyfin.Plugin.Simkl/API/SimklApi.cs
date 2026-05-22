@@ -12,6 +12,7 @@ using Jellyfin.Data.Enums;
 using Jellyfin.Extensions.Json;
 using Jellyfin.Plugin.Simkl.API.Exceptions;
 using Jellyfin.Plugin.Simkl.API.Objects;
+using Jellyfin.Plugin.Simkl.API.Objects.Scrobble;
 using Jellyfin.Plugin.Simkl.API.Responses;
 using MediaBrowser.Common.Net;
 using MediaBrowser.Model.Dto;
@@ -146,6 +147,188 @@ namespace Jellyfin.Plugin.Simkl.API
             return r == null
                 ? (false, item)
                 : (history.Movies.Count == r.Added.Movies && history.Shows.Count == r.Added.Shows, item);
+        }
+
+        /// <summary>
+        /// Reports a real-time scrobble event (start / pause / stop) to Simkl.
+        /// </summary>
+        /// <remarks>
+        /// Implements the <c>/scrobble/{action}</c> lifecycle. The body is built from
+        /// the item's provider ids first; if Simkl can't resolve them (<c>404</c>) it
+        /// falls back to a filename search exactly like <see cref="MarkAsWatched"/>.
+        /// </remarks>
+        /// <param name="action">The scrobble action.</param>
+        /// <param name="item">The item being played.</param>
+        /// <param name="progress">Playback progress as a percentage (0 to 100).</param>
+        /// <param name="userToken">User token.</param>
+        /// <returns><c>true</c> if Simkl accepted the event.</returns>
+        public async Task<bool> ScrobbleAsync(SimklScrobbleAction action, BaseItemDto item, double progress, string userToken)
+        {
+            var body = BuildScrobbleBody(item, progress);
+            if (body == null)
+            {
+                _logger.LogDebug("Nothing to scrobble for {Name} ({Type})", item.Name, item.Type);
+                return false;
+            }
+
+            var status = await PostScrobble(action, body, userToken).ConfigureAwait(false);
+            if (IsScrobbleSuccess(status))
+            {
+                return true;
+            }
+
+            // The 20-second per-user lock or a transient error: don't retry now,
+            // the next real player event will cover it.
+            if (status != System.Net.HttpStatusCode.NotFound)
+            {
+                _logger.LogDebug("Scrobble {Action} returned {Status}, will retry on next event", action, status);
+                return false;
+            }
+
+            // 404 id_err: the ids didn't resolve. Try a filename match (full path, then file name only).
+            _logger.LogDebug("Scrobble ids didn't resolve, trying filename match for {Path}", item.Path);
+            try
+            {
+                body = await BuildScrobbleBodyFromFile(item, progress, true).ConfigureAwait(false);
+            }
+            catch (InvalidDataException)
+            {
+                body = await BuildScrobbleBodyFromFile(item, progress, false).ConfigureAwait(false);
+            }
+
+            if (body == null)
+            {
+                return false;
+            }
+
+            status = await PostScrobble(action, body, userToken).ConfigureAwait(false);
+            return IsScrobbleSuccess(status);
+        }
+
+        /// <summary>
+        /// A scrobble call is considered successful when the server accepted it
+        /// (2xx) or reported a duplicate completion (<c>409</c>), which means the
+        /// item is already watched and no retry is needed.
+        /// </summary>
+        private static bool IsScrobbleSuccess(System.Net.HttpStatusCode status)
+        {
+            return ((int)status >= 200 && (int)status < 300)
+                   || status == System.Net.HttpStatusCode.Conflict;
+        }
+
+        private static SimklScrobbleBody? BuildScrobbleBody(BaseItemDto item, double progress)
+        {
+            var body = new SimklScrobbleBody { Progress = ClampProgress(progress) };
+
+            if (item.IsMovie == true || item.Type == BaseItemKind.Movie)
+            {
+                body.Movie = new ScrobbleMovie(item);
+            }
+            else if (item.Type == BaseItemKind.Episode
+                     || item.IsSeries == true
+                     || item.Type == BaseItemKind.Series)
+            {
+                body.Show = new ScrobbleShow(item);
+                body.Episode = new ScrobbleEpisode(item);
+            }
+            else
+            {
+                return null;
+            }
+
+            return body;
+        }
+
+        private static double ClampProgress(double progress)
+        {
+            return Math.Round(Math.Clamp(progress, 0d, 100d), 2);
+        }
+
+        /// <summary>
+        /// Posts a scrobble body and returns the HTTP status code.
+        /// </summary>
+        private async Task<System.Net.HttpStatusCode> PostScrobble(SimklScrobbleAction action, SimklScrobbleBody body, string userToken)
+        {
+            var endpoint = "/scrobble/" + action.ToString().ToLowerInvariant();
+            using var options = GetOptions(userToken);
+            options.RequestUri = new Uri(Baseurl + endpoint);
+            options.Method = HttpMethod.Post;
+            options.Content = new StringContent(
+                JsonSerializer.Serialize(body, _jsonSerializerOptions),
+                Encoding.UTF8,
+                MediaTypeNames.Application.Json);
+
+            _logger.LogDebug("POST {Endpoint} {@Body}", endpoint, body);
+
+            var response = await _httpClientFactory.CreateClient(NamedClient.Default)
+                .SendAsync(options).ConfigureAwait(false);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                _logger.LogError("Invalid user token, deleting");
+                SimklPlugin.Instance?.Configuration.DeleteUserToken(userToken);
+                throw new InvalidTokenException("Invalid user token");
+            }
+
+            return response.StatusCode;
+        }
+
+        /// <summary>
+        /// Builds a scrobble body by resolving the item through Simkl's filename
+        /// search, used when the provider ids alone don't resolve.
+        /// </summary>
+        private async Task<SimklScrobbleBody?> BuildScrobbleBodyFromFile(BaseItemDto item, double progress, bool fullpath)
+        {
+            var fname = fullpath ? item.Path : Path.GetFileName(item.Path);
+            var mo = await GetFromFile(fname).ConfigureAwait(false);
+            if (mo == null)
+            {
+                throw new InvalidDataException("Search file response is null");
+            }
+
+            var body = new SimklScrobbleBody { Progress = ClampProgress(progress) };
+
+            if (mo.Movie != null && (item.IsMovie == true || item.Type == BaseItemKind.Movie))
+            {
+                if (!string.Equals(mo.Type, "movie", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidDataException("type != movie (" + mo.Type + ")");
+                }
+
+                body.Movie = new ScrobbleMovie
+                {
+                    Title = mo.Movie.Title,
+                    Year = mo.Movie.Year,
+                    Ids = mo.Movie.Ids
+                };
+            }
+            else if (mo.Episode != null
+                     && mo.Show != null
+                     && (item.IsSeries == true || item.Type == BaseItemKind.Episode))
+            {
+                if (!string.Equals(mo.Type, "episode", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidDataException("type != episode (" + mo.Type + ")");
+                }
+
+                body.Show = new ScrobbleShow
+                {
+                    Title = mo.Show.Title,
+                    Year = mo.Show.Year,
+                    Ids = mo.Show.Ids
+                };
+                body.Episode = new ScrobbleEpisode
+                {
+                    Season = mo.Episode.Season,
+                    Number = mo.Episode.Episode
+                };
+            }
+            else
+            {
+                return null;
+            }
+
+            return body;
         }
 
         /// <summary>

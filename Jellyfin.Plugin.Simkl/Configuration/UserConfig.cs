@@ -14,6 +14,7 @@ namespace Jellyfin.Plugin.Simkl.Configuration
         {
             ScrobbleMovies = true;
             ScrobbleShows = true;
+            EnablePlaybackScrobbling = true;
             ScrobblePercentage = 70;
             ScrobbleNowWatchingPercentage = 5;
             MinLength = 5;
@@ -25,6 +26,13 @@ namespace Jellyfin.Plugin.Simkl.Configuration
         /// Gets or sets a value indicating whether scrobble movies.
         /// </summary>
         public bool ScrobbleMovies { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether real-time playback scrobbling
+        /// (start / pause / stop, with the live "Watching now" banner) is enabled.
+        /// When disabled the plugin sends no scrobble events at all.
+        /// </summary>
+        public bool EnablePlaybackScrobbling { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether scrobble shows.

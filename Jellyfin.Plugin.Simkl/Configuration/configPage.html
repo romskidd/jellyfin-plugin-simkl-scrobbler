@@ -38,6 +38,17 @@
                     <h2>Scrobbling options:</h2>
                     <div class="checkboxcontainer">
                         <label>
+                            <input is="emby-checkbox" type="checkbox" id="EnablePlaybackScrobbling"/>
+                            <span>Real-time scrobbling ("Watching now" + auto mark watched)</span>
+                        </label>
+                        <div class="fieldDescription">
+                            Reports start, pause and stop to Simkl as you watch. The title shows
+                            in your "Watching now" banner and is marked watched automatically when
+                            you stop past 80%.
+                        </div>
+                    </div>
+                    <div class="checkboxcontainer">
+                        <label>
                             <input is="emby-checkbox" type="checkbox" id="ScrobbleMovies"/>
                             <span>Autoscrobbling Movies</span>
                         </label>
@@ -49,10 +60,10 @@
                         </label>
                     </div>
                     <div class="inputContainer">
-                        <input is="emby-input" id="ScrobblePercentage" type="number" min="0" max="100" pattern="[0-9]*"
-                               label="Scrobbling percentage:"/>
+                        <input is="emby-input" id="MinLength" type="number" min="0" pattern="[0-9]*"
+                               label="Minimum runtime (minutes):"/>
                         <div class="fieldDescription">
-                            Percentage watched needed to scrobble
+                            Items shorter than this are never scrobbled
                         </div>
                     </div>
                     <button is="emby-button" type="submit" class="raised button-submit block"><span>${Save}</span>
