@@ -3,6 +3,11 @@
 
 ###
 
+##Repo for Jellyfin
+https://raw.githubusercontent.com/romskidd/jellyfin-plugin-simkl/master/manifest.json
+
+###
+
 ## Current features
 - Multi-user support
 - Real-time scrobbling: reports `start` / `pause` / `stop` to Simkl as you watch, so
