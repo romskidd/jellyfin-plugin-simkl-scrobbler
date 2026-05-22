@@ -1,5 +1,5 @@
 <h1 align="center">Jellyfin SIMKL Plugin</h1>
-<h3 align="center">Made with real time scrobble</h3>
+<h3 align="center">Added real time scrobble with the help of Claude</h3>
 
 ###
 
