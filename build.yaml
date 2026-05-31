@@ -1,7 +1,7 @@
 ---
 name: "Simkl"
 guid: "07CAEF58-A94B-4211-A62C-F9774E04EBDB"
-version: 9
+version: "9.0.0.1"
 targetAbi: "10.11.7.0"
 framework: "net9.0"
 owner: "crobibero"
@@ -13,6 +13,10 @@ category: "General"
 artifacts:
   - "Jellyfin.Plugin.Simkl.dll"
 changelog: |-
+  - Fix: stop the per-second "user not logged in" log spam. Sessions that can't be
+    scrobbled (user not logged into Simkl, scrobbling disabled, or item filtered) are
+    now evaluated once and skipped silently instead of being re-checked and re-logged
+    on every playback progress tick. Real-time scrobbling itself is unchanged.
   - Add real-time playback scrobbling: start / pause / stop lifecycle with the live
     "Watching now" banner and automatic watched-marking at 80% (server-side), per the
     Simkl scrobble guide. Replaces the previous one-shot progress polling.

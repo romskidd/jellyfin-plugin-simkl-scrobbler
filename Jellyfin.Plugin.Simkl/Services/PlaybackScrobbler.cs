@@ -133,15 +133,18 @@ namespace Jellyfin.Plugin.Simkl.Services
                 var sessionId = e.Session.Id;
                 var paused = e.IsPaused;
 
-                // First time we see this session (e.g. a client that doesn't emit
-                // a distinct PlaybackStart): treat it as a start.
+                // First time we see this session (or the item changed): evaluate it once.
+                // HandleStartOrResume records the session either way, so we won't land
+                // back here every tick.
                 if (!_sessions.TryGetValue(sessionId, out var state) || state.ItemId != e.MediaInfo.Id)
                 {
-                    if (!paused)
-                    {
-                        await HandleStartOrResume(e).ConfigureAwait(false);
-                    }
+                    await HandleStartOrResume(e).ConfigureAwait(false);
+                    return;
+                }
 
+                // Session already judged not scrobblable: skip silently.
+                if (state.Ignore)
+                {
                     return;
                 }
 
@@ -173,6 +176,13 @@ namespace Jellyfin.Plugin.Simkl.Services
                     return;
                 }
 
+                // If the session was judged not scrobblable at start, don't try to
+                // close it out (that would log again for a not-logged-in user).
+                if (_sessions.TryGetValue(e.Session.Id, out var existing) && existing.Ignore)
+                {
+                    return;
+                }
+
                 // A natural end-of-playback reports 100%; otherwise use the last position.
                 var progress = e.PlayedToCompletion ? 100d : GetProgress(e);
 
@@ -200,15 +210,50 @@ namespace Jellyfin.Plugin.Simkl.Services
                 return;
             }
 
-            if (await SendScrobble(SimklScrobbleAction.Start, e, GetProgress(e)).ConfigureAwait(false))
+            var session = e.Session;
+
+            // Decide eligibility once per session+item. These conditions don't change
+            // mid-playback, so caching the decision stops the per-second re-evaluation
+            // (and the per-second "not logged in" log spam) that happened when an
+            // ineligible session was never recorded.
+            var userConfig = SimklPlugin.Instance?.Configuration.GetByGuid(session.UserId);
+            string? skipReason = null;
+            if (userConfig == null || string.IsNullOrEmpty(userConfig.UserToken))
             {
-                _sessions[e.Session.Id] = new SessionState
-                {
-                    ItemId = e.MediaInfo.Id,
-                    Paused = e.IsPaused,
-                    LastAction = SimklScrobbleAction.Start,
-                    LastSent = DateTime.UtcNow
-                };
+                skipReason = "user " + session.UserName + " not logged in to Simkl";
+            }
+            else if (!userConfig.EnablePlaybackScrobbling)
+            {
+                skipReason = "real-time scrobbling disabled for " + session.UserName;
+            }
+            else if (!TypeEnabled(userConfig, e.MediaInfo.Type) || !LongEnough(userConfig, e))
+            {
+                skipReason = "item filtered by type/length";
+            }
+
+            // Record the session up front, eligible or not, so progress ticks recognise
+            // it and stop reprocessing.
+            var state = new SessionState
+            {
+                ItemId = e.MediaInfo.Id,
+                Paused = e.IsPaused,
+                Ignore = skipReason != null
+            };
+            _sessions[session.Id] = state;
+
+            if (skipReason != null)
+            {
+                // Logged exactly once per session+item, at debug level so it never
+                // floods the main log.
+                _logger.LogDebug("Not scrobbling: {Reason}", skipReason);
+                return;
+            }
+
+            if (!e.IsPaused
+                && await SendScrobble(SimklScrobbleAction.Start, e, GetProgress(e)).ConfigureAwait(false))
+            {
+                state.LastAction = SimklScrobbleAction.Start;
+                state.LastSent = DateTime.UtcNow;
             }
         }
 
@@ -225,7 +270,7 @@ namespace Jellyfin.Plugin.Simkl.Services
             var userConfig = SimklPlugin.Instance?.Configuration.GetByGuid(userId);
             if (userConfig == null || string.IsNullOrEmpty(userConfig.UserToken))
             {
-                _logger.LogInformation("Can't scrobble: user {UserName} not logged in", session.UserName);
+                _logger.LogDebug("Can't scrobble: user {UserName} not logged in", session.UserName);
                 return false;
             }
 
@@ -299,6 +344,14 @@ namespace Jellyfin.Plugin.Simkl.Services
             /// Gets or sets a value indicating whether the session is currently paused.
             /// </summary>
             public bool Paused { get; set; }
+
+            /// <summary>
+            /// Gets or sets a value indicating whether this session has been evaluated
+            /// and judged not scrobblable (not logged in, scrobbling disabled, or the
+            /// item is filtered). When true the session is tracked but skipped silently
+            /// so progress ticks don't re-evaluate or re-log it every second.
+            /// </summary>
+            public bool Ignore { get; set; }
 
             /// <summary>
             /// Gets or sets the last scrobble action that was successfully sent.
