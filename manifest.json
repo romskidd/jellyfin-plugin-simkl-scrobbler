@@ -9,11 +9,11 @@
         "imageUrl": "",
         "versions": [
             {
-                "version": "9.0.0.0",
-                "changelog": "Add real-time playback scrobbling: start / pause / stop lifecycle with the live 'Watching now' banner and automatic watched-marking at 80%.",
+                "version": "9.0.0.3",
+                "changelog": "Add real-time playback scrobbling: start / pause / stop lifecycle with the live 'Watching now' banner and automatic watched-marking at 80%. + Fix for unlogged users",
                 "targetAbi": "10.11.7.0",
-                "sourceUrl": "https://github.com/romskidd/jellyfin-plugin-simkl/releases/download/v9.0.0/simkl_9.0.0.0.zip",
-                "checksum": "3276bbe7dbd66ee2a17c271be391a63f",
+                "sourceUrl": "https://github.com/romskidd/jellyfin-plugin-simkl/releases/download/V9.0.0.3/Simkl_9.0.0.3.zip",
+                "checksum": "a4e6a41f71d9585ad90ed9148bbb9702",
                 "timestamp": "2026-05-22T00:00:00Z"
             }
         ]
