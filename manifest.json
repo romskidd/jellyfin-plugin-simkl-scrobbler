@@ -1,7 +1,7 @@
 [
     {
-        "guid": "07caef58-a94b-4211-a62c-f9774e04ebdb",
-        "name": "Simkl (real-time scrobbling)",
+        "guid": "03a7c840-6154-471f-8be3-856cdc26d500",
+        "name": "Simkl Scrobbler",
         "description": "Scrobble your watched Movies, TV Shows and Anime to Simkl in real time. Reports start, pause and stop as you watch, shows the title in your Simkl 'Watching now' banner, and marks items watched automatically once you stop past 80%.",
         "overview": "Real-time Simkl scrobbling for Jellyfin",
         "owner": "romskidd",
@@ -9,20 +9,12 @@
         "imageUrl": "",
         "versions": [
             {
-                "version": "9.0.0.4",
-                "changelog": "Fix: send the series' own IMDB/TMDB/TVDB ids (not the episode's) when scrobbling an episode, so shows whose episodes carry their own IMDB ids (e.g. Euphoria US) are tracked correctly without falling back to filename search.",
+                "version": "9.1.0.0",
+                "changelog": "New independent plugin identity (own plugin id, updates only through this repository). Includes the 9.0.0.4 fix: the series' own IMDB/TMDB/TVDB ids are sent when scrobbling an episode, so shows whose episodes carry their own IMDB ids (e.g. Euphoria US) are tracked correctly without the filename fallback.",
                 "targetAbi": "10.11.7.0",
-                "sourceUrl": "https://github.com/romskidd/jellyfin-plugin-simkl/releases/download/V9.0.0.4/Simkl_9.0.0.4.zip",
-                "checksum": "b26bc41dbf3df7d87f191900b8e9b880",
-                "timestamp": "2026-08-30T20:40:00Z"
-            },
-            {
-                "version": "9.0.0.3",
-                "changelog": "Add real-time playback scrobbling: start / pause / stop lifecycle with the live 'Watching now' banner and automatic watched-marking at 80%. + Fix for unlogged users",
-                "targetAbi": "10.11.7.0",
-                "sourceUrl": "https://github.com/romskidd/jellyfin-plugin-simkl/releases/download/V9.0.0.3/Simkl_9.0.0.3.zip",
-                "checksum": "a4e6a41f71d9585ad90ed9148bbb9702",
-                "timestamp": "2026-05-22T00:00:00Z"
+                "sourceUrl": "https://github.com/romskidd/jellyfin-plugin-simkl/releases/download/V9.1.0.0/Simkl_Scrobbler_9.1.0.0.zip",
+                "checksum": "59c06b7120e3757fc8a31427132fc5fc",
+                "timestamp": "2026-08-30T21:10:00Z"
             }
         ]
     }

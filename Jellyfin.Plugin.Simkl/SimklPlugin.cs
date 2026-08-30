@@ -30,10 +30,10 @@ namespace Jellyfin.Plugin.Simkl
         public static SimklPlugin? Instance { get; private set; }
 
         /// <inheritdoc />
-        public override Guid Id => new Guid("07CAEF58-A94B-4211-A62C-F9774E04EBDB");
+        public override Guid Id => new Guid("03A7C840-6154-471F-8BE3-856CDC26D500");
 
         /// <inheritdoc />
-        public override string Name => "Simkl";
+        public override string Name => "Simkl Scrobbler";
 
         /// <inheritdoc />
         public override string Description => "Scrobble your watched Movies, TV Shows and Anime to Simkl and share your progress with friends!";

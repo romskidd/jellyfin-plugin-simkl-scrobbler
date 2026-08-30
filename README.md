@@ -1,10 +1,35 @@
-<h1 align="center">Jellyfin SIMKL Plugin</h1>
-<h3 align="center">Added real time scrobble with the help of Claude</h3>
+<h1 align="center">Simkl Scrobbler for Jellyfin</h1>
+<h3 align="center">Real-time Simkl scrobbling — added with the help of Claude</h3>
 
 ###
 
+## About this plugin
+
+This started as a fork of the official [jellyfin-plugin-simkl](https://github.com/jellyfin/jellyfin-plugin-simkl).
+The official plugin only marks items as watched **after** playback (via Simkl's
+`/sync/history`). This plugin adds **real-time scrobbling** on top of it: the
+`start` / `pause` / `stop` lifecycle, the live "Watching now" banner on simkl.com,
+and automatic watched-marking at 80%.
+
+Since version **9.1.0.0** it is a fully independent plugin ("Simkl Scrobbler",
+maintained by [romskidd](https://github.com/romskidd)) with its own plugin id:
+
+- It can never be overwritten by an update of the official plugin, and its
+  updates come only from this repository (add the repo URL below to your
+  Jellyfin plugin catalogs to receive them).
+- Don't run it together with the official Simkl plugin — both would scrobble
+  the same playbacks twice. Install one or the other.
+- If you installed a version **≤ 9.0.0.4** of this fork (which still shared the
+  official plugin id): uninstall it, then install "Simkl Scrobbler" from this
+  repo. Your Simkl login and settings are kept (the configuration file is
+  unchanged).
+
 ## Repo for Jellyfin
+Dashboard → Plugins → Repositories → add:
+
+```
 https://raw.githubusercontent.com/romskidd/jellyfin-plugin-simkl/master/manifest.json
+```
 
 ###
 
@@ -20,6 +45,18 @@ https://raw.githubusercontent.com/romskidd/jellyfin-plugin-simkl/master/manifest
 - Easy login using pin
 - If the provider ids don't resolve, the item is matched by filename via Simkl's API
   and scrobbled anyway
+
+## Version history
+
+| Version | Date | Changes |
+|---|---|---|
+| **9.1.0.0** | 2026-08-30 | New independent identity: own plugin id, name "Simkl Scrobbler", owner romskidd. No functional changes over 9.0.0.4. |
+| **9.0.0.4** | 2026-08-30 | Fix: episodes were scrobbled with the *episode's* own provider ids (e.g. the episode IMDB id) in the `show` object, which Simkl often can't resolve. The parent series is now looked up through the Jellyfin library and its series-level IMDB/TMDB/TVDB ids are sent instead. Fixes tracking for shows whose episodes carry their own IMDB ids (e.g. Euphoria US, For All Mankind) and avoids the flaky filename-search fallback. |
+| **9.0.0.3** | 2026-06-01 | Pin `Jellyfin.Controller` to exactly 10.11.8 so the plugin loads on all Jellyfin 10.11.x servers. First stable release of the log-spam fix below. |
+| 9.0.0.2 | *(never released)* | Same as 9.0.0.1 but accidentally built against Jellyfin.Controller 10.11.10 — failed to load on older 10.11.x servers. Superseded by 9.0.0.3. |
+| 9.0.0.1 | *(tag only)* | Fix: stop the per-second "user not logged in" log spam. Sessions that can't be scrobbled are evaluated once and then skipped silently. |
+| **9.0.0.0** | 2026-05-22 | First fork release: real-time scrobbling (`start`/`pause`/`stop` lifecycle, "Watching now" banner, server-side watched-marking at 80%), settings toggles, filename fallback. |
+| ≤ 8.0.0.0 | — | Upstream history: see the [official plugin releases](https://github.com/jellyfin/jellyfin-plugin-simkl/releases). |
 
 ## Future features
 - Sync all watch status with Simkl
