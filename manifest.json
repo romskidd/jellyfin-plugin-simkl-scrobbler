@@ -9,6 +9,14 @@
         "imageUrl": "",
         "versions": [
             {
+                "version": "9.0.0.4",
+                "changelog": "Fix: send the series' own IMDB/TMDB/TVDB ids (not the episode's) when scrobbling an episode, so shows whose episodes carry their own IMDB ids (e.g. Euphoria US) are tracked correctly without falling back to filename search.",
+                "targetAbi": "10.11.7.0",
+                "sourceUrl": "https://github.com/romskidd/jellyfin-plugin-simkl/releases/download/V9.0.0.4/Simkl_9.0.0.4.zip",
+                "checksum": "b26bc41dbf3df7d87f191900b8e9b880",
+                "timestamp": "2026-08-30T20:40:00Z"
+            },
+            {
                 "version": "9.0.0.3",
                 "changelog": "Add real-time playback scrobbling: start / pause / stop lifecycle with the live 'Watching now' banner and automatic watched-marking at 80%. + Fix for unlogged users",
                 "targetAbi": "10.11.7.0",
