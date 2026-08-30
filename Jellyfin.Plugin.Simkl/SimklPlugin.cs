@@ -30,13 +30,13 @@ namespace Jellyfin.Plugin.Simkl
         public static SimklPlugin? Instance { get; private set; }
 
         /// <inheritdoc />
-        public override Guid Id => new Guid("03A7C840-6154-471F-8BE3-856CDC26D500");
+        public override Guid Id => new Guid("07CAEF58-A94B-4211-A62C-F9774E04EBDB");
 
         /// <inheritdoc />
-        public override string Name => "Simkl Scrobbler";
+        public override string Name => "Simkl (moved to Simkl Scrobbler)";
 
         /// <inheritdoc />
-        public override string Description => "Scrobble your watched Movies, TV Shows and Anime to Simkl and share your progress with friends!";
+        public override string Description => "THIS PLUGIN HAS MOVED: install 'Simkl Scrobbler' from the same repository to keep receiving updates, then uninstall this one. Your Simkl login and settings are kept. Scrobbling keeps working in the meantime.";
 
         /// <inheritdoc />
         public IEnumerable<PluginPageInfo> GetPages()

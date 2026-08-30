@@ -1,21 +1,20 @@
 ---
-name: "Simkl Scrobbler"
-guid: "03A7C840-6154-471F-8BE3-856CDC26D500"
-version: "9.1.0.0"
+name: "Simkl (moved to Simkl Scrobbler)"
+guid: "07CAEF58-A94B-4211-A62C-F9774E04EBDB"
+version: "9.0.0.5"
 targetAbi: "10.11.7.0"
 framework: "net9.0"
 owner: "romskidd"
-overview: "Real-time Simkl scrobbling"
+overview: "This plugin has moved to Simkl Scrobbler"
 description: >
-  Scrobble your watched Movies, TV Shows and Anime to Simkl in real time and share your progress with friends!
+  THIS PLUGIN HAS MOVED: install 'Simkl Scrobbler' from the same repository to keep receiving updates, then uninstall this one. Your Simkl login and settings are kept. Scrobbling keeps working in the meantime.
 
 category: "General"
 artifacts:
   - "Jellyfin.Plugin.Simkl.dll"
 changelog: |-
-  - New plugin identity: "Simkl Scrobbler" now has its own plugin id, fully
-    independent from the official Simkl plugin. Install one or the other; this
-    fork updates only through its own repository.
-  - Fix: send the series' own IMDB/TMDB/TVDB ids (not the episode's) when
-    scrobbling an episode, so shows whose episodes carry their own IMDB ids
-    (e.g. Euphoria US) are tracked correctly without the filename fallback.
+  - Final release under this plugin id. The plugin continues as "Simkl Scrobbler"
+    (new plugin id) in the same repository: install "Simkl Scrobbler" from the
+    catalog, then uninstall this one. Your Simkl login and settings are kept.
+  - Includes the series-ids scrobbling fix from 9.0.0.4, and goes dormant
+    automatically once Simkl Scrobbler is installed (no double scrobbling).

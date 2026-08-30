@@ -2,12 +2,14 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.Simkl.API;
 using Jellyfin.Plugin.Simkl.API.Exceptions;
 using Jellyfin.Plugin.Simkl.Configuration;
+using MediaBrowser.Common.Plugins;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Session;
 using Microsoft.Extensions.Hosting;
@@ -33,10 +35,15 @@ namespace Jellyfin.Plugin.Simkl.Services
         // to stay clear of the server's 20-second per-user lock.
         private static readonly TimeSpan _minActionInterval = TimeSpan.FromSeconds(20);
 
+        // Plugin id of the successor "Simkl Scrobbler" plugin. When it is installed,
+        // this legacy plugin stays dormant so playbacks aren't scrobbled twice.
+        private static readonly Guid _successorPluginId = new Guid("03A7C840-6154-471F-8BE3-856CDC26D500");
+
         private readonly ISessionManager _sessionManager;
         private readonly ILogger<PlaybackScrobbler> _logger;
         private readonly SimklApi _simklApi;
         private readonly ILibraryManager _libraryManager;
+        private readonly IPluginManager _pluginManager;
         private readonly ConcurrentDictionary<string, SessionState> _sessions;
 
         /// <summary>
@@ -46,22 +53,39 @@ namespace Jellyfin.Plugin.Simkl.Services
         /// <param name="logger">Instance of the <see cref="ILogger{PlaybackScrobbler}"/> interface.</param>
         /// <param name="simklApi">Instance of the <see cref="SimklApi"/>.</param>
         /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
+        /// <param name="pluginManager">Instance of the <see cref="IPluginManager"/> interface.</param>
         public PlaybackScrobbler(
             ISessionManager sessionManager,
             ILogger<PlaybackScrobbler> logger,
             SimklApi simklApi,
-            ILibraryManager libraryManager)
+            ILibraryManager libraryManager,
+            IPluginManager pluginManager)
         {
             _sessionManager = sessionManager;
             _logger = logger;
             _simklApi = simklApi;
             _libraryManager = libraryManager;
+            _pluginManager = pluginManager;
             _sessions = new ConcurrentDictionary<string, SessionState>();
         }
 
         /// <inheritdoc />
         public Task StartAsync(CancellationToken cancellationToken)
         {
+            if (_pluginManager.Plugins.Any(p => p.Id == _successorPluginId))
+            {
+                _logger.LogWarning(
+                    "Simkl Scrobbler (the successor of this plugin) is installed: "
+                    + "this legacy Simkl plugin stays dormant and can safely be uninstalled.");
+                return Task.CompletedTask;
+            }
+
+            _logger.LogWarning(
+                "This Simkl plugin has MOVED to 'Simkl Scrobbler' (new plugin id) and will not receive "
+                + "updates anymore. Install 'Simkl Scrobbler' from the same plugin repository, then "
+                + "uninstall this one. Your Simkl login and settings are kept. "
+                + "Scrobbling keeps working in the meantime.");
+
             _sessionManager.PlaybackStart += OnPlaybackStart;
             _sessionManager.PlaybackProgress += OnPlaybackProgress;
             _sessionManager.PlaybackStopped += OnPlaybackStopped;
