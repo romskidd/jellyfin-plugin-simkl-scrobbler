@@ -12,7 +12,7 @@
                 "version": "9.1.0.0",
                 "changelog": "New independent plugin identity (own plugin id, updates only through this repository). Includes the 9.0.0.4 fix: the series' own IMDB/TMDB/TVDB ids are sent when scrobbling an episode, so shows whose episodes carry their own IMDB ids (e.g. Euphoria US) are tracked correctly without the filename fallback.",
                 "targetAbi": "10.11.7.0",
-                "sourceUrl": "https://github.com/romskidd/jellyfin-plugin-simkl/releases/download/V9.1.0.0/Simkl_Scrobbler_9.1.0.0.zip",
+                "sourceUrl": "https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/releases/download/V9.1.0.0/Simkl_Scrobbler_9.1.0.0.zip",
                 "checksum": "59c06b7120e3757fc8a31427132fc5fc",
                 "timestamp": "2026-08-30T21:10:00Z"
             }

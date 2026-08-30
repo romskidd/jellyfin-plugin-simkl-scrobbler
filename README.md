@@ -7,7 +7,7 @@
 > official Simkl plugin — old installs will **not** receive updates anymore.
 > One-time fix: uninstall the old "Simkl" plugin, then install **"Simkl Scrobbler"**
 > from the same repo URL below. Your Simkl login and settings are kept.
-> Details in [the pinned issue](https://github.com/romskidd/jellyfin-plugin-simkl/issues).
+> Details in [the pinned issue](https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/issues).
 
 ###
 
@@ -36,7 +36,7 @@ maintained by [romskidd](https://github.com/romskidd)) with its own plugin id:
 Dashboard → Plugins → Repositories → add:
 
 ```
-https://raw.githubusercontent.com/romskidd/jellyfin-plugin-simkl/master/manifest.json
+https://raw.githubusercontent.com/romskidd/jellyfin-plugin-simkl-scrobbler/master/manifest.json
 ```
 
 ###
