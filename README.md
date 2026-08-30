@@ -1,6 +1,14 @@
 <h1 align="center">Simkl Scrobbler for Jellyfin</h1>
 <h3 align="center">Real-time Simkl scrobbling — added with the help of Claude</h3>
 
+> [!WARNING]
+> **Installed a version ≤ 9.0.0.4 of this plugin (before 2026-08-30)?**
+> The plugin changed its id in **9.1.0.0** and is now fully independent from the
+> official Simkl plugin — old installs will **not** receive updates anymore.
+> One-time fix: uninstall the old "Simkl" plugin, then install **"Simkl Scrobbler"**
+> from the same repo URL below. Your Simkl login and settings are kept.
+> Details in [the pinned issue](https://github.com/romskidd/jellyfin-plugin-simkl/issues).
+
 ###
 
 ## About this plugin
