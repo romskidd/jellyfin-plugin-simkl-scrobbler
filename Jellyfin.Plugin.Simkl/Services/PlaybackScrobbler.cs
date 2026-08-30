@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,6 +36,7 @@ namespace Jellyfin.Plugin.Simkl.Services
         private readonly ISessionManager _sessionManager;
         private readonly ILogger<PlaybackScrobbler> _logger;
         private readonly SimklApi _simklApi;
+        private readonly ILibraryManager _libraryManager;
         private readonly ConcurrentDictionary<string, SessionState> _sessions;
 
         /// <summary>
@@ -43,14 +45,17 @@ namespace Jellyfin.Plugin.Simkl.Services
         /// <param name="sessionManager">Instance of the <see cref="ISessionManager"/> interface.</param>
         /// <param name="logger">Instance of the <see cref="ILogger{PlaybackScrobbler}"/> interface.</param>
         /// <param name="simklApi">Instance of the <see cref="SimklApi"/>.</param>
+        /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
         public PlaybackScrobbler(
             ISessionManager sessionManager,
             ILogger<PlaybackScrobbler> logger,
-            SimklApi simklApi)
+            SimklApi simklApi,
+            ILibraryManager libraryManager)
         {
             _sessionManager = sessionManager;
             _logger = logger;
             _simklApi = simklApi;
+            _libraryManager = libraryManager;
             _sessions = new ConcurrentDictionary<string, SessionState>();
         }
 
@@ -303,7 +308,8 @@ namespace Jellyfin.Plugin.Simkl.Services
                     progress,
                     session.UserName);
 
-                var success = await _simklApi.ScrobbleAsync(action, mediaInfo, progress, userConfig.UserToken)
+                var success = await _simklApi.ScrobbleAsync(
+                        action, mediaInfo, progress, userConfig.UserToken, ResolveSeriesProviderIds(mediaInfo))
                     .ConfigureAwait(false);
 
                 if (success && _sessions.TryGetValue(session.Id, out var s))
@@ -328,6 +334,43 @@ namespace Jellyfin.Plugin.Simkl.Services
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Resolves the parent series' provider ids for an episode item.
+        /// </summary>
+        /// <remarks>
+        /// Episodes carry their own IMDB/TVDB/TMDB ids, which are different from
+        /// the series-level ids that Simkl needs to identify the show. This method
+        /// looks up the parent series via the library and returns its provider ids.
+        /// Returns null for non-episode items (movies use their own ids directly).
+        /// </remarks>
+        private Dictionary<string, string>? ResolveSeriesProviderIds(MediaBrowser.Model.Dto.BaseItemDto item)
+        {
+            if (item.Type != BaseItemKind.Episode || item.SeriesId == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                var series = _libraryManager.GetItemById(item.SeriesId.Value);
+                var providerIds = series?.ProviderIds;
+                if (providerIds is { Count: > 0 })
+                {
+                    _logger.LogDebug(
+                        "Resolved series IDs for {Episode}: {Ids}",
+                        item.Name,
+                        string.Join(", ", providerIds));
+                    return new Dictionary<string, string>(providerIds, StringComparer.OrdinalIgnoreCase);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Could not resolve series for episode {Name}", item.Name);
+            }
+
+            return null;
         }
 
         /// <summary>

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics.Tracing;
 using System.IO;
 using System.Net.Http;
@@ -161,10 +162,13 @@ namespace Jellyfin.Plugin.Simkl.API
         /// <param name="item">The item being played.</param>
         /// <param name="progress">Playback progress as a percentage (0 to 100).</param>
         /// <param name="userToken">User token.</param>
+        /// <param name="seriesProviderIds">Optional series-level provider ids, resolved
+        /// by the caller when the item is an episode. When present these are used for
+        /// the <c>show</c> object instead of the episode's own ids.</param>
         /// <returns><c>true</c> if Simkl accepted the event.</returns>
-        public async Task<bool> ScrobbleAsync(SimklScrobbleAction action, BaseItemDto item, double progress, string userToken)
+        public async Task<bool> ScrobbleAsync(SimklScrobbleAction action, BaseItemDto item, double progress, string userToken, Dictionary<string, string>? seriesProviderIds = null)
         {
-            var body = BuildScrobbleBody(item, progress);
+            var body = BuildScrobbleBody(item, progress, seriesProviderIds);
             if (body == null)
             {
                 _logger.LogDebug("Nothing to scrobble for {Name} ({Type})", item.Name, item.Type);
@@ -216,7 +220,7 @@ namespace Jellyfin.Plugin.Simkl.API
                    || status == System.Net.HttpStatusCode.Conflict;
         }
 
-        private static SimklScrobbleBody? BuildScrobbleBody(BaseItemDto item, double progress)
+        private static SimklScrobbleBody? BuildScrobbleBody(BaseItemDto item, double progress, Dictionary<string, string>? seriesProviderIds = null)
         {
             var body = new SimklScrobbleBody { Progress = ClampProgress(progress) };
 
@@ -228,7 +232,23 @@ namespace Jellyfin.Plugin.Simkl.API
                      || item.IsSeries == true
                      || item.Type == BaseItemKind.Series)
             {
-                body.Show = new ScrobbleShow(item);
+                // Use the resolved series provider ids when available, otherwise
+                // fall back to the item's own ids (which for an episode are the
+                // episode-level ids — they may or may not match the show on Simkl).
+                if (seriesProviderIds != null)
+                {
+                    body.Show = new ScrobbleShow
+                    {
+                        Title = item.SeriesName,
+                        Year = item.ProductionYear,
+                        Ids = new SimklShowIds(seriesProviderIds)
+                    };
+                }
+                else
+                {
+                    body.Show = new ScrobbleShow(item);
+                }
+
                 body.Episode = new ScrobbleEpisode(item);
             }
             else
