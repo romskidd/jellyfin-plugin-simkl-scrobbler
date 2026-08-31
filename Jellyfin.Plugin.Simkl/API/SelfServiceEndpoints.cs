@@ -140,6 +140,7 @@ namespace Jellyfin.Plugin.Simkl.API
                     ScrobbleShows = config?.ScrobbleShows ?? true,
                     SyncMarkPlayed = config?.SyncMarkPlayed ?? true,
                     SyncMarkUnplayed = config?.SyncMarkUnplayed ?? false,
+                    EnableRewatches = config?.EnableRewatches ?? false,
                     MinLength = config?.MinLength ?? 5,
                     ExcludedLibraries = config?.ExcludedLibraries ?? Array.Empty<string>()
                 }
@@ -271,6 +272,7 @@ namespace Jellyfin.Plugin.Simkl.API
             config.ScrobbleShows = options.ScrobbleShows;
             config.SyncMarkPlayed = options.SyncMarkPlayed;
             config.SyncMarkUnplayed = options.SyncMarkUnplayed;
+            config.EnableRewatches = options.EnableRewatches;
             config.MinLength = Math.Clamp(options.MinLength, 0, 600);
             config.ExcludedLibraries = options.ExcludedLibraries?.ToArray() ?? Array.Empty<string>();
             plugin.SaveConfiguration();

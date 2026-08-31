@@ -40,6 +40,12 @@ namespace Jellyfin.Plugin.Simkl.API.Objects
         public bool SyncMarkUnplayed { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether finishing something already
+        /// watched is recorded as a Simkl rewatch session (Pro/VIP only).
+        /// </summary>
+        public bool EnableRewatches { get; set; }
+
+        /// <summary>
         /// Gets or sets the minimum runtime, in minutes, below which nothing is scrobbled.
         /// </summary>
         public int MinLength { get; set; }

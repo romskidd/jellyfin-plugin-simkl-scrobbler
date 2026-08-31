@@ -45,5 +45,13 @@ namespace Jellyfin.Plugin.Simkl.API.Objects
         /// </summary>
         [JsonPropertyName("watched_at")]
         public DateTime? WatchedAt { get; set; }
+
+        /// <summary>
+        /// Gets or sets the rewatch session to write into, when replaying a
+        /// movie the user has already completed.
+        /// </summary>
+        [JsonPropertyName("rewatch_id")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? RewatchId { get; set; }
     }
 }

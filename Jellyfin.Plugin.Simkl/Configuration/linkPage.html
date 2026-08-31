@@ -250,6 +250,16 @@
             <div class="simkl-opt">
                 <label><input type="checkbox" id="simklScrobbleShows"/><span>Scrobble TV Shows</span></label>
             </div>
+            <div class="simkl-opt" id="simklRewatchOption">
+                <label>
+                    <input type="checkbox" id="simklEnableRewatches"/>
+                    <span>Record rewatches as separate Simkl sessions</span>
+                </label>
+                <div class="simkl-hint">
+                    Finishing something you had already watched is filed as a rewatch
+                    instead of doing nothing. Requires Simkl Pro or VIP.
+                </div>
+            </div>
             <div class="simkl-opt">
                 <label>
                     <input type="checkbox" id="simklSyncMarkPlayed"/>
@@ -390,7 +400,7 @@
             }
 
             var optionKeys = ['EnablePlaybackScrobbling', 'ScrobbleMovies', 'ScrobbleShows',
-                'SyncMarkPlayed', 'SyncMarkUnplayed'];
+                'SyncMarkPlayed', 'SyncMarkUnplayed', 'EnableRewatches'];
 
             function applyOptions(options) {
                 optionKeys.forEach(function (key) {
@@ -443,6 +453,11 @@
                 }
 
                 el('simklAccountPill').textContent = label;
+
+                // Rewatches are a paid Simkl feature: on a free account the call
+                // is silently ignored, so don't offer a switch that does nothing.
+                var paid = plan && ['PRO', 'VIP'].indexOf(String(plan).toUpperCase()) !== -1;
+                el('simklRewatchOption').hidden = !paid;
                 var last = pick(status, 'LastScrobble');
                 el('simklLastScrobble').textContent = last
                     ? 'Last scrobble: ' + last

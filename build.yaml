@@ -1,7 +1,7 @@
 ---
 name: "Simkl Scrobbler"
 guid: "03A7C840-6154-471F-8BE3-856CDC26D500"
-version: "9.3.0.0"
+version: "9.3.1.0"
 targetAbi: "10.11.7.0"
 framework: "net9.0"
 owner: "romskidd"
@@ -13,9 +13,6 @@ category: "General"
 artifacts:
   - "Jellyfin.Plugin.Simkl.dll"
 changelog: |-
-  - Self-service linking: any Jellyfin user can now connect their own Simkl
-    account from a standalone page (/Simkl/Link), without dashboard access.
-    The admin settings page shows the link to share. No extra plugin required.
-  - New per-user endpoints that always act on the caller's own profile.
-  - The plugin now appears in the dashboard's left sidebar, and the settings
-    page was redesigned (cards, connection status, stats tiles).
+  - Rewatches: finishing something you had already watched is now recorded as a
+    separate Simkl rewatch session instead of doing nothing. Off by default,
+    and only offered on Simkl Pro/VIP accounts, which is what Simkl requires.

@@ -58,5 +58,14 @@ namespace Jellyfin.Plugin.Simkl.API.Objects
         /// </summary>
         [JsonPropertyName("seasons")]
         public IReadOnlyList<Season>? Seasons { get; set; }
+
+        /// <summary>
+        /// Gets or sets the rewatch session to write into. Pinning the id Simkl
+        /// returned for the session keeps every episode of a rewatch in the same
+        /// session instead of forking new ones.
+        /// </summary>
+        [JsonPropertyName("rewatch_id")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? RewatchId { get; set; }
     }
 }

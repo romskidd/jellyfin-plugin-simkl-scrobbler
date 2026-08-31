@@ -93,6 +93,13 @@ namespace Jellyfin.Plugin.Simkl.Configuration
         public string? LastScrobble { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether finishing something already
+        /// watched is recorded as a Simkl rewatch session. Simkl only honours
+        /// this for Pro and VIP accounts.
+        /// </summary>
+        public bool EnableRewatches { get; set; }
+
+        /// <summary>
         /// Gets or sets a value indicating whether the Simkl token was rejected
         /// and removed. The user has to link again; without this the removal is
         /// silent and scrobbling appears to work while it no longer does.

@@ -242,6 +242,148 @@ namespace Jellyfin.Plugin.Simkl.API
         }
 
         /// <summary>
+        /// Asks Simkl whether the user has already watched an item
+        /// (<c>POST /sync/watched</c>).
+        /// </summary>
+        /// <remarks>
+        /// Simkl is the authority here, not Jellyfin: something watched years
+        /// ago — before this server existed, or on another device — is watched
+        /// as far as Simkl is concerned even though Jellyfin has never seen it.
+        /// </remarks>
+        /// <param name="query">The item to look up.</param>
+        /// <param name="userToken">User token.</param>
+        /// <returns><c>true</c> or <c>false</c>, or null when Simkl couldn't answer.</returns>
+        public async Task<bool?> IsWatchedAsync(SimklWatchedQuery query, string userToken)
+        {
+            using var options = GetOptions(userToken);
+            options.RequestUri = BuildUri("/sync/watched");
+            options.Method = HttpMethod.Post;
+            options.Content = new StringContent(
+                JsonSerializer.Serialize(new[] { query }, _jsonSerializerOptions),
+                Encoding.UTF8,
+                MediaTypeNames.Application.Json);
+
+            var response = await _httpClientFactory.CreateClient(NamedClient.Default)
+                .SendAsync(options).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogDebug("Watched lookup returned {Status}", response.StatusCode);
+                return null;
+            }
+
+            var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            try
+            {
+                using var document = JsonDocument.Parse(body);
+                if (document.RootElement.ValueKind != JsonValueKind.Array
+                    || document.RootElement.GetArrayLength() == 0)
+                {
+                    return null;
+                }
+
+                var first = document.RootElement[0];
+
+                // "result" is true/false, or the string "not_found" when Simkl
+                // couldn't resolve the ids at all — which is not an answer.
+                if (first.TryGetProperty("result", out var result))
+                {
+                    if (result.ValueKind == JsonValueKind.True)
+                    {
+                        return true;
+                    }
+
+                    if (result.ValueKind == JsonValueKind.String)
+                    {
+                        return null;
+                    }
+                }
+
+                // For a title-level lookup, only "completed" counts as watched:
+                // "watching" or "plantowatch" is not a finished viewing.
+                if (first.TryGetProperty("list", out var list)
+                    && list.ValueKind == JsonValueKind.String)
+                {
+                    return string.Equals(list.GetString(), "completed", StringComparison.OrdinalIgnoreCase);
+                }
+
+                return result.ValueKind == JsonValueKind.False ? false : null;
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogDebug(ex, "Could not read the watched lookup response");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Records a watch of something the user already finished, as a Simkl
+        /// rewatch session (<c>POST /sync/history?allow_rewatch=yes</c>).
+        /// </summary>
+        /// <remarks>
+        /// Simkl decides whether to open a new session or extend the running
+        /// one; the id it returns must be pinned on later writes so a series
+        /// rewatched episode by episode stays in a single session. Rewatches
+        /// are a Pro/VIP feature: for a free account the call is accepted and
+        /// silently does nothing.
+        /// </remarks>
+        /// <param name="history">The watch to record.</param>
+        /// <param name="userToken">User token.</param>
+        /// <returns>The rewatch session id, when Simkl reported one.</returns>
+        public async Task<int?> AddRewatchAsync(SimklHistory history, string userToken)
+        {
+            using var options = GetOptions(userToken);
+            options.RequestUri = BuildUri("/sync/history?allow_rewatch=yes");
+            options.Method = HttpMethod.Post;
+            options.Content = new StringContent(
+                JsonSerializer.Serialize(history, _jsonSerializerOptions),
+                Encoding.UTF8,
+                MediaTypeNames.Application.Json);
+
+            var response = await _httpClientFactory.CreateClient(NamedClient.Default)
+                .SendAsync(options).ConfigureAwait(false);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                SimklPlugin.Instance?.Configuration.DeleteUserToken(userToken);
+                throw new InvalidTokenException("Invalid user token");
+            }
+
+            var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogDebug("Rewatch write returned {Status}", response.StatusCode);
+                return null;
+            }
+
+            // Read the id defensively: only this one field matters, and the
+            // surrounding shape is free to grow.
+            try
+            {
+                using var document = JsonDocument.Parse(body);
+                if (document.RootElement.TryGetProperty("added", out var added)
+                    && added.TryGetProperty("statuses", out var statuses)
+                    && statuses.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var status in statuses.EnumerateArray())
+                    {
+                        if (status.TryGetProperty("rewatch_id", out var id)
+                            && id.TryGetInt32(out var value))
+                        {
+                            return value;
+                        }
+                    }
+                }
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogDebug(ex, "Could not read the rewatch id from the response");
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Removes the given items from the user's Simkl watch history
         /// (<c>POST /sync/history/remove</c>).
         /// </summary>
