@@ -35,20 +35,19 @@
                 }
 
                 #SimklConfigurationPage .simklPill {
-                    margin-left: auto;
                     display: inline-flex;
                     align-items: center;
                     gap: 0.5em;
-                    padding: 0.32em 0.85em;
+                    padding: 0.35em 0.9em;
                     border-radius: 999px;
-                    font-size: 0.82em;
-                    white-space: nowrap;
+                    font-size: 0.88em;
                     background: rgba(127, 127, 127, 0.16);
                     border: 1px solid rgba(127, 127, 127, 0.25);
                 }
 
                 #SimklConfigurationPage .simklPill::before {
                     content: '';
+                    flex: 0 0 auto;
                     width: 0.55em;
                     height: 0.55em;
                     border-radius: 50%;
@@ -93,11 +92,6 @@
                 #SimklConfigurationPage .simklAccountRow .simklGrow {
                     flex: 1 1 14em;
                     min-width: 0;
-                }
-
-                #SimklConfigurationPage .simklHello {
-                    font-size: 1.15em;
-                    font-weight: 500;
                 }
 
                 #SimklConfigurationPage .simklMuted {
@@ -191,7 +185,6 @@
                     <h1>Simkl Scrobbler</h1>
                     <p class="simklTagline">Real-time scrobbling — start, pause and stop, straight to Simkl.</p>
                 </div>
-                <span id="connectionPill" class="simklPill">Not connected</span>
             </div>
 
             <form id="SimklConfigurationForm">
@@ -245,7 +238,7 @@
                     <div class="simklCard">
                         <div class="simklAccountRow">
                             <div class="simklGrow">
-                                <div class="simklHello">Hello again <span id="simklName">USERNAME</span>!</div>
+                                <span id="connectionPill" class="simklPill is-on">Account connected</span>
                                 <div id="lastScrobble" class="simklMuted"></div>
                             </div>
                             <button onclick="SimklConfig.logOut();" is="emby-button" type="button"
@@ -339,17 +332,24 @@
             userSelector: document.querySelector('#user-selector'),
             loginButtonContainer: document.querySelector('#loginButtonContainer'),
             configOptionsContainer: document.querySelector('#configOptionsContainer'),
-            simklName: document.querySelector('#simklName'),
             loginSecondsRemaining: document.querySelector('#loginSecondsRemaining'),
             loginText: document.querySelector('#loginText'),
             loginPin: document.querySelector('#loginPin'),
             loggingIn: document.querySelector('#loggingIn'),
             connectionPill: document.querySelector('#connectionPill'),
+            users: [],
 
             populateUsers: async function (users) {
+                SimklConfig.users = users;
                 users.forEach(function (user) {
                     SimklConfig.userSelector.append(new Option(user.Name, user.Id));
                 });
+            },
+            // Jellyfin profile name for a user id, used in the connection label.
+            profileName: function (userId) {
+                const norm = function (s) { return (s || '').replace(/-/g, '').toLowerCase(); };
+                const match = SimklConfig.users.filter(function (u) { return norm(u.Id) === norm(userId); });
+                return match.length > 0 ? match[0].Name : '';
             },
             // Point the profile selector at the given user. Ids can come with or
             // without dashes depending on the API call, so compare normalized.
@@ -388,7 +388,6 @@
                     SimklConfig.configOptionsContainer.removeAttribute('hidden');
                     await this.populateOptionsContainer(config.UserConfigs.filter(e => e.Id === user)[0]);
                 } else {
-                    SimklConfig.setConnectionPill('Not connected', false);
                     SimklConfig.loginButtonContainer.removeAttribute('hidden');
                 }
             },
@@ -413,18 +412,21 @@
                 ApiClient.updatePluginConfiguration(this.guid, this.configCache).then(Dashboard.processPluginConfigurationUpdateResult);
             },
             populateOptionsContainer: async function (userConfig) {
-                // The greeting and stats are decorative: never let them block
-                // the rest of the page (spinner + unpopulated options).
+                // The connection label and stats are decorative: never let them
+                // block the rest of the page (spinner + unpopulated options).
+                const profile = SimklConfig.profileName(userConfig.Id);
                 try {
                     const settings = await SimklAPI.getUserSettings(userConfig.Id);
                     const name = (settings && settings.user && settings.user.name) ? settings.user.name : 'Simkl user';
                     const plan = (settings && settings.account && settings.account.type) ? settings.account.type.toUpperCase() : null;
-                    SimklConfig.simklName.innerText = name;
-                    SimklConfig.setConnectionPill(plan ? 'Connected · ' + plan : 'Connected', true);
+                    SimklConfig.setConnectionPill(
+                        'Account connected: ' + name + (plan ? ' - ' + plan : '') + (profile ? ' to ' + profile : ''),
+                        true);
                 } catch (err) {
                     console.error("Couldn't load Simkl user settings", err);
-                    SimklConfig.simklName.innerText = 'Simkl user';
-                    SimklConfig.setConnectionPill('Connected', true);
+                    SimklConfig.setConnectionPill(
+                        'Account connected' + (profile ? ' to ' + profile : ''),
+                        true);
                 }
 
                 const lastScrobbleEl = document.querySelector('#lastScrobble');
@@ -654,14 +656,18 @@
             .addEventListener('pageshow', async function () {
                 Dashboard.showLoadingMsg();
                 try {
-                    await Promise.all([
-                        window.ApiClient.getUsers().then(SimklConfig.populateUsers),
-                        window.ApiClient.getPluginConfiguration(SimklConfig.guid).then(SimklConfig.loadConfig.bind(SimklConfig, ApiClient.getCurrentUserId()))]);
+                    // Users first: the connection label needs the profile names,
+                    // so loading the config must not race with this.
+                    const currentUserId = ApiClient.getCurrentUserId();
+                    await SimklConfig.populateUsers(await window.ApiClient.getUsers());
 
                     // Keep the profile selector in sync with the profile whose
                     // settings are displayed (the logged-in user), so Save and
                     // Log In always target what the page is showing.
-                    SimklConfig.selectUser(ApiClient.getCurrentUserId());
+                    SimklConfig.selectUser(currentUserId);
+
+                    const config = await window.ApiClient.getPluginConfiguration(SimklConfig.guid);
+                    await SimklConfig.loadConfig(currentUserId, config);
                 } catch (err) {
                     console.error('Simkl config page failed to load', err);
                 } finally {
