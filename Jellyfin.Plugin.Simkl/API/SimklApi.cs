@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.Tracing;
+using System.Globalization;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -263,17 +264,26 @@ namespace Jellyfin.Plugin.Simkl.API
         }
 
         /// <summary>
-        /// Fetches the user's Simkl watch statistics (<c>GET /users/stats</c>)
-        /// and returns the raw JSON body, so callers can pass it through
-        /// without depending on the exact response shape.
+        /// Fetches the user's Simkl watch statistics
+        /// (<c>POST /users/{id}/stats</c>) and returns the raw JSON body, so
+        /// callers can pass it through without depending on the exact response
+        /// shape. The Simkl account id is resolved through the settings call.
         /// </summary>
         /// <param name="userToken">User token.</param>
         /// <returns>The raw JSON response, or null when the request failed.</returns>
         public async Task<string?> GetUserStatsRaw(string userToken)
         {
+            var settings = await GetUserSettings(userToken).ConfigureAwait(false);
+            var accountId = settings?.Account?.Id;
+            if (accountId == null)
+            {
+                _logger.LogDebug("No Simkl account id available, can't fetch stats");
+                return null;
+            }
+
             using var options = GetOptions(userToken);
-            options.RequestUri = BuildUri("/users/stats");
-            options.Method = HttpMethod.Get;
+            options.RequestUri = BuildUri("/users/" + accountId.Value.ToString(CultureInfo.InvariantCulture) + "/stats");
+            options.Method = HttpMethod.Post;
             var response = await _httpClientFactory.CreateClient(NamedClient.Default)
                 .SendAsync(options).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
@@ -507,8 +517,14 @@ namespace Jellyfin.Plugin.Simkl.API
         /// </summary>
         private static Uri BuildUri(string relativeUrl)
         {
-            var separator = relativeUrl.Contains('?', StringComparison.Ordinal) ? '&' : '?';
-            return new Uri(Baseurl + relativeUrl + separator + _identityQuery);
+            if (relativeUrl.Contains('?', StringComparison.Ordinal))
+            {
+                return new Uri(Baseurl + relativeUrl + '&' + _identityQuery);
+            }
+
+            // The Simkl router doesn't resolve "path/?query": a trailing slash
+            // followed by a query string yields a 200 with a null body.
+            return new Uri(Baseurl + relativeUrl.TrimEnd('/') + '?' + _identityQuery);
         }
 
         private static SimklHistory CreateHistoryFromItem(BaseItemDto item)

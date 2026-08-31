@@ -161,7 +161,17 @@
                 ApiClient.updatePluginConfiguration(this.guid, this.configCache).then(Dashboard.processPluginConfigurationUpdateResult);
             },
             populateOptionsContainer: async function (userConfig) {
-                SimklConfig.simklName.innerText = (await SimklAPI.getUserSettings(userConfig.Id)).user.name;
+                // The greeting and stats are decorative: never let them block
+                // the rest of the page (spinner + unpopulated options).
+                try {
+                    const settings = await SimklAPI.getUserSettings(userConfig.Id);
+                    const name = (settings && settings.user && settings.user.name) ? settings.user.name : 'Simkl user';
+                    const type = (settings && settings.account && settings.account.type) ? ' (' + settings.account.type.toUpperCase() + ')' : '';
+                    SimklConfig.simklName.innerText = name + type;
+                } catch (err) {
+                    console.error("Couldn't load Simkl user settings", err);
+                    SimklConfig.simklName.innerText = 'Simkl user';
+                }
 
                 const lastScrobbleEl = document.querySelector('#lastScrobble');
                 lastScrobbleEl.innerText = userConfig.LastScrobble
@@ -172,6 +182,8 @@
                 statsEl.innerText = '';
                 SimklAPI.getUserStats(userConfig.Id).then(function (stats) {
                     statsEl.innerText = SimklConfig.formatStats(stats);
+                }).catch(function (err) {
+                    console.log("Couldn't render Simkl stats", err);
                 });
 
                 for (const key in userConfig) {
@@ -374,10 +386,15 @@
         document.querySelector('#SimklConfigurationPage')
             .addEventListener('pageshow', async function () {
                 Dashboard.showLoadingMsg();
-                await Promise.all([
-                    window.ApiClient.getUsers().then(SimklConfig.populateUsers),
-                    window.ApiClient.getPluginConfiguration(SimklConfig.guid).then(SimklConfig.loadConfig.bind(SimklConfig, ApiClient.getCurrentUserId()))]);
-                Dashboard.hideLoadingMsg();
+                try {
+                    await Promise.all([
+                        window.ApiClient.getUsers().then(SimklConfig.populateUsers),
+                        window.ApiClient.getPluginConfiguration(SimklConfig.guid).then(SimklConfig.loadConfig.bind(SimklConfig, ApiClient.getCurrentUserId()))]);
+                } catch (err) {
+                    console.error('Simkl config page failed to load', err);
+                } finally {
+                    Dashboard.hideLoadingMsg();
+                }
             });
 
         document.querySelector('#SimklConfigurationForm')

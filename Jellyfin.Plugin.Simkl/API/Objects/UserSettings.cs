@@ -14,6 +14,12 @@ namespace Jellyfin.Plugin.Simkl.API.Objects
         public User? User { get; set; }
 
         /// <summary>
+        /// Gets or sets the account information (id, type, timezone).
+        /// </summary>
+        [JsonPropertyName("account")]
+        public SimklAccount? Account { get; set; }
+
+        /// <summary>
         /// Gets or sets error.
         /// </summary>
         [JsonPropertyName("error")]
