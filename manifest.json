@@ -9,12 +9,12 @@
         "imageUrl": "",
         "versions": [
             {
-                "version": "9.2.0.0",
-                "changelog": "Manual check marks now sync to Simkl: ticking an episode, a season or a movie as played adds it to your history (batched per season), and optionally unticking removes it (off by default). The settings page now shows your Simkl watch statistics and the last scrobble result. Every API request now identifies the app to Simkl (app-name/app-version), as required since April 2026.",
+                "version": "9.2.0.2",
+                "changelog": "Manual check marks now sync to Simkl: ticking an episode, a season or a movie as played adds it to your history (batched per season), and optionally unticking removes it (off by default). The settings page shows your Simkl watch statistics, account type and the last scrobble result, and the profile selector now opens on the logged-in user. Every API request now identifies the app to Simkl (app-name/app-version), as required since April 2026. Replaces the broken 9.2.0.0.",
                 "targetAbi": "10.11.7.0",
-                "sourceUrl": "https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/releases/download/V9.2.0.0/Simkl_Scrobbler_9.2.0.0.zip",
-                "checksum": "3945f164a9cc9e335acb2d6ec92d3c4d",
-                "timestamp": "2026-08-31T12:00:00Z"
+                "sourceUrl": "https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/releases/download/V9.2.0.2/Simkl_Scrobbler_9.2.0.2.zip",
+                "checksum": "0b56acf551561fc24f63db9239f81e50",
+                "timestamp": "2026-08-31T16:30:00Z"
             },
             {
                 "version": "9.1.0.0",
