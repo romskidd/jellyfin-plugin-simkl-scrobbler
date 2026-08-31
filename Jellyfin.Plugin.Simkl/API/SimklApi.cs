@@ -55,6 +55,25 @@ namespace Jellyfin.Plugin.Simkl.API
         public const string Secret = @"87893fc73cdbd2e51a7c63975c6f941ac1c6155c0e20ffa76b83202dd10a507e";
 
         /// <summary>
+        /// App identifier sent with every request, as required by the Simkl API
+        /// (see api.simkl.org/conventions/headers).
+        /// </summary>
+        private const string AppName = "simkl-scrobbler";
+
+        /// <summary>
+        /// Plugin version reported to Simkl alongside <see cref="AppName"/>.
+        /// </summary>
+        private static readonly string _appVersion =
+            typeof(SimklApi).Assembly.GetName().Version?.ToString() ?? "0.0.0.0";
+
+        /// <summary>
+        /// Query string identifying this app, appended to every request URI.
+        /// Simkl requires client_id, app-name and app-version as URL parameters.
+        /// </summary>
+        private static readonly string _identityQuery =
+            "client_id=" + Apikey + "&app-name=" + AppName + "&app-version=" + _appVersion;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="SimklApi"/> class.
         /// </summary>
         /// <param name="logger">Instance of the <see cref="ILogger{SimklApi}"/> interface.</param>
@@ -76,7 +95,7 @@ namespace Jellyfin.Plugin.Simkl.API
         /// <returns>Code response.</returns>
         public async Task<CodeResponse?> GetCode()
         {
-            var uri = $"/oauth/pin?client_id={Apikey}&redirect={RedirectUri}";
+            var uri = $"/oauth/pin?redirect={RedirectUri}";
             return await Get<CodeResponse>(uri);
         }
 
@@ -87,7 +106,7 @@ namespace Jellyfin.Plugin.Simkl.API
         /// <returns>Code status.</returns>
         public async Task<CodeStatusResponse?> GetCodeStatus(string userCode)
         {
-            var uri = $"/oauth/pin/{userCode}?client_id={Apikey}";
+            var uri = $"/oauth/pin/{userCode}";
             return await Get<CodeStatusResponse>(uri);
         }
 
@@ -210,6 +229,63 @@ namespace Jellyfin.Plugin.Simkl.API
         }
 
         /// <summary>
+        /// Adds the given items to the user's Simkl watch history
+        /// (<c>POST /sync/history</c>).
+        /// </summary>
+        /// <param name="history">History object.</param>
+        /// <param name="userToken">User token.</param>
+        /// <returns>The sync history response.</returns>
+        public async Task<SyncHistoryResponse?> AddToHistory(SimklHistory history, string userToken)
+        {
+            return await SyncHistoryAsync(history, userToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Removes the given items from the user's Simkl watch history
+        /// (<c>POST /sync/history/remove</c>).
+        /// </summary>
+        /// <param name="history">History object.</param>
+        /// <param name="userToken">User token.</param>
+        /// <returns>The sync history response.</returns>
+        public async Task<SyncHistoryResponse?> RemoveFromHistory(SimklHistory history, string userToken)
+        {
+            try
+            {
+                return await Post<SyncHistoryResponse, SimklHistory>("/sync/history/remove", userToken, history)
+                    .ConfigureAwait(false);
+            }
+            catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                _logger.LogError(e, "Invalid user token, deleting");
+                SimklPlugin.Instance?.Configuration.DeleteUserToken(userToken);
+                throw new InvalidTokenException("Invalid user token");
+            }
+        }
+
+        /// <summary>
+        /// Fetches the user's Simkl watch statistics (<c>GET /users/stats</c>)
+        /// and returns the raw JSON body, so callers can pass it through
+        /// without depending on the exact response shape.
+        /// </summary>
+        /// <param name="userToken">User token.</param>
+        /// <returns>The raw JSON response, or null when the request failed.</returns>
+        public async Task<string?> GetUserStatsRaw(string userToken)
+        {
+            using var options = GetOptions(userToken);
+            options.RequestUri = BuildUri("/users/stats");
+            options.Method = HttpMethod.Get;
+            var response = await _httpClientFactory.CreateClient(NamedClient.Default)
+                .SendAsync(options).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogDebug("GET /users/stats returned {Status}", response.StatusCode);
+                return null;
+            }
+
+            return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        }
+
+        /// <summary>
         /// A scrobble call is considered successful when the server accepted it
         /// (2xx) or reported a duplicate completion (<c>409</c>), which means the
         /// item is already watched and no retry is needed.
@@ -271,7 +347,7 @@ namespace Jellyfin.Plugin.Simkl.API
         {
             var endpoint = "/scrobble/" + action.ToString().ToLowerInvariant();
             using var options = GetOptions(userToken);
-            options.RequestUri = new Uri(Baseurl + endpoint);
+            options.RequestUri = BuildUri(endpoint);
             options.Method = HttpMethod.Post;
             options.Content = new StringContent(
                 JsonSerializer.Serialize(body, _jsonSerializerOptions),
@@ -415,12 +491,24 @@ namespace Jellyfin.Plugin.Simkl.API
         {
             var requestMessage = new HttpRequestMessage();
             requestMessage.Headers.TryAddWithoutValidation("simkl-api-key", Apikey);
+            requestMessage.Headers.UserAgent.Add(new ProductInfoHeaderValue("SimklScrobbler", _appVersion));
             if (!string.IsNullOrEmpty(userToken))
             {
                 requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", userToken);
             }
 
             return requestMessage;
+        }
+
+        /// <summary>
+        /// Builds the absolute request URI, appending the app identification
+        /// parameters (client_id, app-name, app-version) Simkl requires on
+        /// every request.
+        /// </summary>
+        private static Uri BuildUri(string relativeUrl)
+        {
+            var separator = relativeUrl.Contains('?', StringComparison.Ordinal) ? '&' : '?';
+            return new Uri(Baseurl + relativeUrl + separator + _identityQuery);
         }
 
         private static SimklHistory CreateHistoryFromItem(BaseItemDto item)
@@ -476,7 +564,7 @@ namespace Jellyfin.Plugin.Simkl.API
         {
             // Todo: If string is not null neither empty
             using var options = GetOptions(userToken);
-            options.RequestUri = new Uri(Baseurl + url);
+            options.RequestUri = BuildUri(url);
             options.Method = HttpMethod.Get;
             var responseMessage = await _httpClientFactory.CreateClient(NamedClient.Default)
                 .SendAsync(options);
@@ -493,7 +581,7 @@ namespace Jellyfin.Plugin.Simkl.API
          where T2 : class
         {
             using var options = GetOptions(userToken);
-            options.RequestUri = new Uri(Baseurl + url);
+            options.RequestUri = BuildUri(url);
             options.Method = HttpMethod.Post;
 
             if (data != null)

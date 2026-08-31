@@ -33,6 +33,8 @@
                 </div>
                 <div id="configOptionsContainer" hidden>
                     <h3>Hello again <span id="simklName">USERNAME</span>!</h3>
+                    <div id="accountStats" class="fieldDescription" style="margin-bottom: 0.3em;"></div>
+                    <div id="lastScrobble" class="fieldDescription" style="margin-bottom: 1em;"></div>
                     <button onclick="SimklConfig.logOut();" is="emby-button" type="button" class="raised button block">
                         <span>Log Out</span></button>
                     <h2>Scrobbling options:</h2>
@@ -58,6 +60,27 @@
                             <input is="emby-checkbox" type="checkbox" id="ScrobbleShows"/>
                             <span>Autoscrobbling TV Shows</span>
                         </label>
+                    </div>
+                    <div class="checkboxcontainer">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="SyncMarkPlayed"/>
+                            <span>Sync manual "mark played" to Simkl</span>
+                        </label>
+                        <div class="fieldDescription">
+                            When you tick an episode, season or movie as played in Jellyfin,
+                            it is added to your Simkl history (bulk actions are batched into
+                            a single request).
+                        </div>
+                    </div>
+                    <div class="checkboxcontainer">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="SyncMarkUnplayed"/>
+                            <span>Also remove from Simkl when unmarking</span>
+                        </label>
+                        <div class="fieldDescription">
+                            When you untick an item, it is removed from your Simkl history.
+                            Off by default to avoid accidental deletions.
+                        </div>
                     </div>
                     <div class="inputContainer">
                         <input is="emby-input" id="MinLength" type="number" min="0" pattern="[0-9]*"
@@ -140,6 +163,17 @@
             populateOptionsContainer: async function (userConfig) {
                 SimklConfig.simklName.innerText = (await SimklAPI.getUserSettings(userConfig.Id)).user.name;
 
+                const lastScrobbleEl = document.querySelector('#lastScrobble');
+                lastScrobbleEl.innerText = userConfig.LastScrobble
+                    ? 'Last scrobble: ' + userConfig.LastScrobble
+                    : 'No scrobble recorded yet on this server.';
+
+                const statsEl = document.querySelector('#accountStats');
+                statsEl.innerText = '';
+                SimklAPI.getUserStats(userConfig.Id).then(function (stats) {
+                    statsEl.innerText = SimklConfig.formatStats(stats);
+                });
+
                 for (const key in userConfig) {
                     const chk = document.querySelector("#configOptionsContainer input[type=checkbox]#" + key);
                     if (chk) {
@@ -213,6 +247,26 @@
                 window.clearInterval(this.remainingTimer);
                 SimklConfig.loginButtonContainer.removeAttribute('hidden');
                 SimklConfig.loggingIn.setAttribute('hidden', '');
+            },
+            formatStats: function (stats) {
+                if (!stats) {
+                    return '';
+                }
+
+                const mins = function (o) {
+                    return (o && typeof o.total_mins === 'number') ? o.total_mins : null;
+                };
+                const fmt = function (m) {
+                    const h = m / 60;
+                    return h >= 72 ? Math.round(h / 24) + ' days' : Math.round(h) + ' h';
+                };
+
+                const parts = [];
+                if (mins(stats) != null) parts.push('total ' + fmt(mins(stats)));
+                if (mins(stats.movies) != null) parts.push('movies ' + fmt(mins(stats.movies)));
+                if (mins(stats.tv) != null) parts.push('TV ' + fmt(mins(stats.tv)));
+                if (mins(stats.anime) != null) parts.push('anime ' + fmt(mins(stats.anime)));
+                return parts.length > 0 ? 'Watched on Simkl: ' + parts.join(' · ') : '';
             },
             onSelectorChange: async function () {
                 if (this.onLoginProcess) {
@@ -297,6 +351,22 @@
                     .catch(function (result) {
                         console.error(result);
                         Dashboard.alert("Something went wrong, see logs for more details");
+                    });
+            },
+            getUserStats: function (secret) {
+                const request = {
+                    url: window.ApiClient.getUrl('Simkl/users/stats/' + secret),
+                    type: 'GET',
+                    headers: {
+                        accept: 'application/json'
+                    }
+                }
+
+                // Stats are decorative: fail silently.
+                return window.ApiClient.fetch(request)
+                    .catch(function (result) {
+                        console.log("Couldn't load Simkl stats", result);
+                        return null;
                     });
             }
         }

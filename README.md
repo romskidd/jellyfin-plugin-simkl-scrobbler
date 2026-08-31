@@ -50,6 +50,11 @@ https://raw.githubusercontent.com/romskidd/jellyfin-plugin-simkl-scrobbler/maste
 - Events are sent only on real player transitions (start, pause, resume, stop) — never
   polled on a timer — to respect Simkl's rate limits and 20-second per-user lock
 - Per-user toggles for Movies, TV Shows and a minimum runtime filter
+- Manual check marks sync too: ticking an episode, a season or a movie as played
+  adds it to your Simkl history (batched into a single request), and optionally
+  unticking removes it (off by default)
+- The settings page shows your Simkl watch statistics and the result of the
+  last scrobble
 - Easy login using pin
 - If the provider ids don't resolve, the item is matched by filename via Simkl's API
   and scrobbled anyway
@@ -58,6 +63,7 @@ https://raw.githubusercontent.com/romskidd/jellyfin-plugin-simkl-scrobbler/maste
 
 | Version | Date | Changes |
 |---|---|---|
+| **9.2.0.0** | 2026-08-31 | Manual "mark played" (and optional unmark) now syncs to Simkl, batched per season. Settings page shows Simkl watch stats and the last scrobble result. Every API request now identifies the app (`app-name`/`app-version`), required by Simkl since April 2026. |
 | **9.1.0.0** | 2026-08-30 | New independent identity: own plugin id, name "Simkl Scrobbler", owner romskidd. No functional changes over 9.0.0.4. |
 | **9.0.0.4** | 2026-08-30 | Fix: episodes were scrobbled with the *episode's* own provider ids (e.g. the episode IMDB id) in the `show` object, which Simkl often can't resolve. The parent series is now looked up through the Jellyfin library and its series-level IMDB/TMDB/TVDB ids are sent instead. Fixes tracking for shows whose episodes carry their own IMDB ids (e.g. Euphoria US, For All Mankind) and avoids the flaky filename-search fallback. |
 | **9.0.0.3** | 2026-06-01 | Pin `Jellyfin.Controller` to exactly 10.11.8 so the plugin loads on all Jellyfin 10.11.x servers. First stable release of the log-spam fix below. |

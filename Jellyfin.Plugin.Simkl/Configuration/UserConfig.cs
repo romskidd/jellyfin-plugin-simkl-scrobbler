@@ -20,6 +20,8 @@ namespace Jellyfin.Plugin.Simkl.Configuration
             MinLength = 5;
             UserToken = string.Empty; // Todo: check if token is still valid
             ScrobbleTimeout = 30;
+            SyncMarkPlayed = true;
+            SyncMarkUnplayed = false;
         }
 
         /// <summary>
@@ -69,6 +71,25 @@ namespace Jellyfin.Plugin.Simkl.Configuration
         /// Time between scrobbling tries.
         /// </remarks>
         public int ScrobbleTimeout { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether manually marking an item as
+        /// played in Jellyfin adds it to the Simkl watch history.
+        /// </summary>
+        public bool SyncMarkPlayed { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether manually unmarking an item
+        /// in Jellyfin also removes it from the Simkl watch history. Off by
+        /// default to avoid accidental deletions.
+        /// </summary>
+        public bool SyncMarkUnplayed { get; set; }
+
+        /// <summary>
+        /// Gets or sets a short human-readable summary of the last scrobble
+        /// attempt, shown on the configuration page.
+        /// </summary>
+        public string? LastScrobble { get; set; }
 
         /// <summary>
         /// Gets or sets user id.

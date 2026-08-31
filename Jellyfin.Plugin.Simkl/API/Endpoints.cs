@@ -63,5 +63,28 @@ namespace Jellyfin.Plugin.Simkl.API
 
             return await _simklApi.GetUserSettings(userConfiguration.UserToken);
         }
+
+        /// <summary>
+        /// Gets the Simkl watch statistics for the user, passed through as raw JSON.
+        /// </summary>
+        /// <param name="userId">The user id.</param>
+        /// <returns>The user's Simkl statistics.</returns>
+        [HttpGet("users/stats/{userId}")]
+        public async Task<ActionResult> GetUserStats([FromRoute] Guid userId)
+        {
+            var userConfiguration = SimklPlugin.Instance?.Configuration.GetByGuid(userId);
+            if (userConfiguration == null || string.IsNullOrEmpty(userConfiguration.UserToken))
+            {
+                return NotFound();
+            }
+
+            var raw = await _simklApi.GetUserStatsRaw(userConfiguration.UserToken);
+            if (raw == null)
+            {
+                return NotFound();
+            }
+
+            return Content(raw, "application/json");
+        }
     }
 }

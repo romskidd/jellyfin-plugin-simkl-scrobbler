@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -318,6 +319,7 @@ namespace Jellyfin.Plugin.Simkl.Services
                     s.LastSent = DateTime.UtcNow;
                 }
 
+                RecordLastScrobble(userConfig, action, mediaInfo, progress, success);
                 return success;
             }
             catch (InvalidTokenException)
@@ -334,6 +336,26 @@ namespace Jellyfin.Plugin.Simkl.Services
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Records a short summary of the last scrobble attempt in the user's
+        /// configuration, shown on the plugin configuration page.
+        /// </summary>
+        private static void RecordLastScrobble(UserConfig userConfig, SimklScrobbleAction action, MediaBrowser.Model.Dto.BaseItemDto item, double progress, bool success)
+        {
+            var displayName = string.IsNullOrEmpty(item.SeriesName)
+                ? item.Name
+                : item.SeriesName + " - " + item.Name;
+            userConfig.LastScrobble = string.Format(
+                CultureInfo.InvariantCulture,
+                "{0} {1} - {2} ({3:0.#}%) at {4:yyyy-MM-dd HH:mm} UTC",
+                success ? "OK:" : "FAILED:",
+                action,
+                displayName,
+                progress,
+                DateTime.UtcNow);
+            SimklPlugin.Instance?.SaveConfiguration();
         }
 
         /// <summary>

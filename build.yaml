@@ -1,7 +1,7 @@
 ---
 name: "Simkl Scrobbler"
 guid: "03A7C840-6154-471F-8BE3-856CDC26D500"
-version: "9.1.0.0"
+version: "9.2.0.0"
 targetAbi: "10.11.7.0"
 framework: "net9.0"
 owner: "romskidd"
@@ -13,9 +13,10 @@ category: "General"
 artifacts:
   - "Jellyfin.Plugin.Simkl.dll"
 changelog: |-
-  - New plugin identity: "Simkl Scrobbler" now has its own plugin id, fully
-    independent from the official Simkl plugin. Install one or the other; this
-    fork updates only through its own repository.
-  - Fix: send the series' own IMDB/TMDB/TVDB ids (not the episode's) when
-    scrobbling an episode, so shows whose episodes carry their own IMDB ids
-    (e.g. Euphoria US) are tracked correctly without the filename fallback.
+  - Manual check marks now sync to Simkl: ticking an episode, a season or a
+    movie as played adds it to your Simkl history (batched into one request),
+    and optionally unticking removes it (off by default).
+  - Config page: shows your Simkl watch statistics and the last scrobble
+    result, plus toggles for the new mark-played sync.
+  - API compliance: every request now identifies the app to Simkl
+    (app-name/app-version), as required by the Simkl API since April 2026.
