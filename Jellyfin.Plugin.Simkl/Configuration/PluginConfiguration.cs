@@ -33,6 +33,25 @@ namespace Jellyfin.Plugin.Simkl.Configuration
         }
 
         /// <summary>
+        /// Gets the config for a user, creating an empty one when the user has
+        /// never been configured yet.
+        /// </summary>
+        /// <param name="id">The user id.</param>
+        /// <returns>The stored or newly created user config.</returns>
+        public UserConfig GetOrCreate(Guid id)
+        {
+            var existing = GetByGuid(id);
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            var created = new UserConfig { Id = id };
+            UserConfigs = UserConfigs.Append(created).ToArray();
+            return created;
+        }
+
+        /// <summary>
         /// Delete user token.
         /// </summary>
         /// <param name="userToken">User token.</param>

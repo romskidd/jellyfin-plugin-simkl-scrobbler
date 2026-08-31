@@ -178,6 +178,25 @@
                     flex: 1 1 12em;
                     margin: 0 !important;
                 }
+
+                #SimklConfigurationPage .simklLinkRow {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.6em;
+                    flex-wrap: wrap;
+                }
+
+                #SimklConfigurationPage .simklUrlInput {
+                    flex: 1 1 16em;
+                    min-width: 0;
+                    font: inherit;
+                    font-size: 0.9em;
+                    color: inherit;
+                    padding: 0.55em 0.7em;
+                    border-radius: 8px;
+                    border: 1px solid rgba(127, 127, 127, 0.28);
+                    background: rgba(127, 127, 127, 0.12);
+                }
             </style>
 
             <div class="simklHeader">
@@ -317,6 +336,20 @@
                             <span>${Cancel}</span></button>
                     </div>
                 </div>
+
+                <div class="simklCard">
+                    <div class="simklCardTitle">Link for your users</div>
+                    <p class="simklMuted" style="margin-top:0;">
+                        Users without dashboard access can open this link to connect their own
+                        Simkl account and set their own options. They just need to be signed in
+                        to Jellyfin in the same browser.
+                    </p>
+                    <div class="simklLinkRow">
+                        <input id="selfServiceUrl" type="text" readonly class="simklUrlInput"/>
+                        <button is="emby-button" type="button" class="raised simklLogout"
+                                onclick="SimklConfig.copySelfServiceUrl();"><span>Copy</span></button>
+                    </div>
+                </div>
             </form>
         </div>
     </div>
@@ -361,6 +394,30 @@
                         SimklConfig.userSelector.selectedIndex = i;
                         return;
                     }
+                }
+            },
+            // The page users can open themselves, shown so the admin can share it.
+            fillSelfServiceUrl: function () {
+                const input = document.querySelector('#selfServiceUrl');
+                if (input) {
+                    input.value = window.ApiClient.getUrl('Simkl/Link');
+                }
+            },
+            copySelfServiceUrl: function () {
+                const input = document.querySelector('#selfServiceUrl');
+                if (!input) {
+                    return;
+                }
+
+                input.select();
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(input.value).then(function () {
+                        Dashboard.alert('Link copied');
+                    }).catch(function () {
+                        Dashboard.alert('Copy the selected link with Ctrl+C');
+                    });
+                } else {
+                    Dashboard.alert('Copy the selected link with Ctrl+C');
                 }
             },
             setConnectionPill: function (text, connected) {
@@ -665,6 +722,7 @@
                     // settings are displayed (the logged-in user), so Save and
                     // Log In always target what the page is showing.
                     SimklConfig.selectUser(currentUserId);
+                    SimklConfig.fillSelfServiceUrl();
 
                     const config = await window.ApiClient.getPluginConfiguration(SimklConfig.guid);
                     await SimklConfig.loadConfig(currentUserId, config);

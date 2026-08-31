@@ -1,0 +1,240 @@
+using System;
+using System.IO;
+using System.Threading.Tasks;
+using Jellyfin.Plugin.Simkl.API.Objects;
+using Jellyfin.Plugin.Simkl.API.Responses;
+using MediaBrowser.Controller.Net;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+
+namespace Jellyfin.Plugin.Simkl.API
+{
+    /// <summary>
+    /// Endpoints letting any Jellyfin user link and configure their own Simkl
+    /// account, without needing access to the admin dashboard.
+    /// </summary>
+    /// <remarks>
+    /// Every endpoint derives the profile it acts on from the caller's own
+    /// access token — never from a parameter — so a user can only ever read or
+    /// change their own link. They are paired with the self-service page served
+    /// by <see cref="GetLinkPage"/>.
+    /// </remarks>
+    [ApiController]
+    [Authorize]
+    [Route("Simkl")]
+    public class SelfServiceEndpoints : ControllerBase
+    {
+        private readonly SimklApi _simklApi;
+        private readonly IAuthorizationContext _authContext;
+        private readonly ILogger<SelfServiceEndpoints> _logger;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SelfServiceEndpoints"/> class.
+        /// </summary>
+        /// <param name="simklApi">Instance of the <see cref="SimklApi"/>.</param>
+        /// <param name="authContext">Instance of the <see cref="IAuthorizationContext"/> interface.</param>
+        /// <param name="logger">Instance of the <see cref="ILogger{SelfServiceEndpoints}"/> interface.</param>
+        public SelfServiceEndpoints(
+            SimklApi simklApi,
+            IAuthorizationContext authContext,
+            ILogger<SelfServiceEndpoints> logger)
+        {
+            _simklApi = simklApi;
+            _authContext = authContext;
+            _logger = logger;
+        }
+
+        /// <summary>
+        /// Serves the standalone page users open to link their own Simkl account.
+        /// </summary>
+        /// <remarks>
+        /// Anonymous on purpose: the browser has to load the page before its
+        /// script can authenticate. The page itself contains no user data and
+        /// every call it makes is authenticated.
+        /// </remarks>
+        /// <returns>The self-service HTML page.</returns>
+        [HttpGet("Link")]
+        [AllowAnonymous]
+        public ActionResult GetLinkPage()
+        {
+            var stream = GetType().Assembly
+                .GetManifestResourceStream("Jellyfin.Plugin.Simkl.Configuration.linkPage.html");
+            if (stream == null)
+            {
+                return NotFound();
+            }
+
+            using var reader = new StreamReader(stream);
+            return Content(reader.ReadToEnd(), "text/html; charset=utf-8");
+        }
+
+        /// <summary>
+        /// Gets the Simkl link status and options of the calling user.
+        /// </summary>
+        /// <returns>The caller's status.</returns>
+        [HttpGet("Me")]
+        public async Task<ActionResult> GetMe()
+        {
+            var userId = await GetCallerId().ConfigureAwait(false);
+            if (userId == null)
+            {
+                return Unauthorized();
+            }
+
+            var config = SimklPlugin.Instance?.Configuration.GetByGuid(userId.Value);
+            var linked = config != null && !string.IsNullOrEmpty(config.UserToken);
+
+            string? simklName = null;
+            string? simklPlan = null;
+            if (linked)
+            {
+                var settings = await _simklApi.GetUserSettings(config!.UserToken).ConfigureAwait(false);
+                simklName = settings?.User?.Name;
+                simklPlan = settings?.Account?.Type;
+            }
+
+            return Ok(new
+            {
+                Linked = linked,
+                SimklName = simklName,
+                SimklPlan = simklPlan,
+                LastScrobble = config?.LastScrobble,
+                Options = new SimklUserOptions
+                {
+                    EnablePlaybackScrobbling = config?.EnablePlaybackScrobbling ?? true,
+                    ScrobbleMovies = config?.ScrobbleMovies ?? true,
+                    ScrobbleShows = config?.ScrobbleShows ?? true,
+                    SyncMarkPlayed = config?.SyncMarkPlayed ?? true,
+                    SyncMarkUnplayed = config?.SyncMarkUnplayed ?? false,
+                    MinLength = config?.MinLength ?? 5
+                }
+            });
+        }
+
+        /// <summary>
+        /// Starts the Simkl PIN flow for the calling user.
+        /// </summary>
+        /// <returns>The PIN code to enter on simkl.com.</returns>
+        [HttpPost("Me/Pin")]
+        public async Task<ActionResult<CodeResponse?>> StartPin()
+        {
+            var userId = await GetCallerId().ConfigureAwait(false);
+            if (userId == null)
+            {
+                return Unauthorized();
+            }
+
+            return await _simklApi.GetCode().ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Polls the PIN flow and, once approved, stores the token on the
+        /// calling user's own profile.
+        /// </summary>
+        /// <param name="userCode">The PIN being polled.</param>
+        /// <returns>Whether the account is now linked.</returns>
+        [HttpGet("Me/Pin/{userCode}")]
+        public async Task<ActionResult> PollPin([FromRoute] string userCode)
+        {
+            var userId = await GetCallerId().ConfigureAwait(false);
+            if (userId == null)
+            {
+                return Unauthorized();
+            }
+
+            var status = await _simklApi.GetCodeStatus(userCode).ConfigureAwait(false);
+            if (status == null)
+            {
+                return Ok(new { Linked = false, Pending = false });
+            }
+
+            if (!string.Equals(status.Result, "OK", StringComparison.OrdinalIgnoreCase))
+            {
+                return Ok(new { Linked = false, Pending = true });
+            }
+
+            var plugin = SimklPlugin.Instance;
+            if (plugin == null || string.IsNullOrEmpty(status.AccessToken))
+            {
+                return Ok(new { Linked = false, Pending = false });
+            }
+
+            plugin.Configuration.GetOrCreate(userId.Value).UserToken = status.AccessToken;
+            plugin.SaveConfiguration();
+            _logger.LogInformation("Simkl account linked by user {UserId} from the self-service page", userId);
+
+            return Ok(new { Linked = true, Pending = false });
+        }
+
+        /// <summary>
+        /// Unlinks the calling user's Simkl account.
+        /// </summary>
+        /// <returns>No content.</returns>
+        [HttpPost("Me/Unlink")]
+        public async Task<ActionResult> Unlink()
+        {
+            var userId = await GetCallerId().ConfigureAwait(false);
+            if (userId == null)
+            {
+                return Unauthorized();
+            }
+
+            var plugin = SimklPlugin.Instance;
+            if (plugin != null)
+            {
+                plugin.Configuration.GetOrCreate(userId.Value).UserToken = string.Empty;
+                plugin.SaveConfiguration();
+            }
+
+            return NoContent();
+        }
+
+        /// <summary>
+        /// Saves the calling user's own scrobbling options.
+        /// </summary>
+        /// <param name="options">The options to store.</param>
+        /// <returns>No content.</returns>
+        [HttpPost("Me/Options")]
+        public async Task<ActionResult> SaveOptions([FromBody] SimklUserOptions options)
+        {
+            var userId = await GetCallerId().ConfigureAwait(false);
+            if (userId == null)
+            {
+                return Unauthorized();
+            }
+
+            var plugin = SimklPlugin.Instance;
+            if (plugin == null)
+            {
+                return NoContent();
+            }
+
+            var config = plugin.Configuration.GetOrCreate(userId.Value);
+            config.EnablePlaybackScrobbling = options.EnablePlaybackScrobbling;
+            config.ScrobbleMovies = options.ScrobbleMovies;
+            config.ScrobbleShows = options.ScrobbleShows;
+            config.SyncMarkPlayed = options.SyncMarkPlayed;
+            config.SyncMarkUnplayed = options.SyncMarkUnplayed;
+            config.MinLength = Math.Clamp(options.MinLength, 0, 600);
+            plugin.SaveConfiguration();
+
+            return NoContent();
+        }
+
+        /// <summary>
+        /// Resolves the Jellyfin user behind the current request, or null when
+        /// the request carries an API key rather than a real user session.
+        /// </summary>
+        private async Task<Guid?> GetCallerId()
+        {
+            var auth = await _authContext.GetAuthorizationInfo(Request).ConfigureAwait(false);
+            if (auth.User == null || auth.UserId.Equals(default))
+            {
+                return null;
+            }
+
+            return auth.UserId;
+        }
+    }
+}
