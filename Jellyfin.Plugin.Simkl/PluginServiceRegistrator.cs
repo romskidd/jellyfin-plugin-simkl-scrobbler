@@ -13,6 +13,12 @@ namespace Jellyfin.Plugin.Simkl
         public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
         {
             serviceCollection.AddSingleton<SimklApi>();
+            serviceCollection.AddSingleton<LibraryFilter>();
+
+            // The retry queue is both a hosted service and a dependency of the
+            // scrobbler, so it is registered once and resolved for both roles.
+            serviceCollection.AddSingleton<ScrobbleRetryQueue>();
+            serviceCollection.AddHostedService(sp => sp.GetRequiredService<ScrobbleRetryQueue>());
             serviceCollection.AddHostedService<PlaybackScrobbler>();
             serviceCollection.AddHostedService<UserDataSync>();
             serviceCollection.AddHostedService<PluginPagesRegistration>();

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Jellyfin.Plugin.Simkl.API.Objects
 {
     /// <summary>
@@ -41,5 +43,10 @@ namespace Jellyfin.Plugin.Simkl.API.Objects
         /// Gets or sets the minimum runtime, in minutes, below which nothing is scrobbled.
         /// </summary>
         public int MinLength { get; set; }
+
+        /// <summary>
+        /// Gets or sets the ids of the libraries that are never scrobbled.
+        /// </summary>
+        public IReadOnlyList<string>? ExcludedLibraries { get; set; }
     }
 }

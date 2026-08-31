@@ -179,6 +179,27 @@
                     margin: 0 !important;
                 }
 
+                #SimklConfigurationPage .simklLibs {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(12em, 1fr));
+                    gap: 0.35em 1em;
+                    margin-top: 0.7em;
+                }
+
+                #SimklConfigurationPage .simklLibs label {
+                    display: flex;
+                    gap: 0.6em;
+                    align-items: center;
+                    cursor: pointer;
+                }
+
+                #SimklConfigurationPage .simklLibs input {
+                    flex: 0 0 auto;
+                    width: 1.1em;
+                    height: 1.1em;
+                    margin: 0;
+                }
+
                 /* Detaches the sharing card from the Save / Cancel row above it. */
                 #SimklConfigurationPage .simklCardSpaced {
                     margin-top: 2.2em;
@@ -227,8 +248,12 @@
 
                 <div id="loginButtonContainer" hidden>
                     <div class="simklCard">
-                        <div class="simklCardTitle">Not linked yet</div>
-                        <p class="simklMuted" style="margin-top:0;">
+                        <div class="simklCardTitle" id="notLinkedTitle">Not linked yet</div>
+                        <p class="simklMuted" id="expiredNote" hidden style="margin-top:0;">
+                            <strong>Simkl rejected the saved login for this profile, so it was removed.</strong>
+                            Nothing has been scrobbled since. Log in again to resume — the settings were kept.
+                        </p>
+                        <p class="simklMuted" id="firstTimeNote" style="margin-top:0;">
                             Link this profile to a Simkl account to start scrobbling. You'll get a
                             short PIN to enter on simkl.com — no password is ever shared.
                         </p>
@@ -324,13 +349,20 @@
                     </div>
 
                     <div class="simklCard">
-                        <div class="simklCardTitle">Filter</div>
-                        <div class="inputContainer" style="margin-bottom:0;">
+                        <div class="simklCardTitle">Filters</div>
+                        <div class="inputContainer">
                             <input is="emby-input" id="MinLength" type="number" min="0" pattern="[0-9]*"
                                    label="Minimum runtime (minutes):"/>
                             <div class="fieldDescription">
                                 Items shorter than this are never scrobbled.
                             </div>
+                        </div>
+                        <div style="margin-top:1.2em;">
+                            <div>Never scrobble from these libraries</div>
+                            <div class="fieldDescription">
+                                Useful for home videos or anything you'd rather keep off Simkl.
+                            </div>
+                            <div id="excludedLibraries" class="simklLibs"></div>
                         </div>
                     </div>
 
@@ -456,6 +488,13 @@
                     SimklConfig.configOptionsContainer.removeAttribute('hidden');
                     await this.populateOptionsContainer(config.UserConfigs.filter(e => e.Id === user)[0]);
                 } else {
+                    // Distinguish "never linked" from "Simkl rejected the token",
+                    // which would otherwise look identical and silent.
+                    const stored = config.UserConfigs.filter(e => e.Id === user)[0];
+                    const expired = !!(stored && stored.LinkExpired);
+                    document.querySelector('#expiredNote').hidden = !expired;
+                    document.querySelector('#firstTimeNote').hidden = expired;
+                    document.querySelector('#notLinkedTitle').innerText = expired ? 'Link expired' : 'Not linked yet';
                     SimklConfig.loginButtonContainer.removeAttribute('hidden');
                 }
             },
@@ -474,6 +513,11 @@
                         }
                     }
                 }
+
+                // Array-valued settings aren't covered by the loop above.
+                uconfig.ExcludedLibraries = Array.prototype.slice
+                    .call(document.querySelectorAll('#excludedLibraries input:checked'))
+                    .map(function (input) { return input.value; });
 
                 console.log("Saving config:");
                 console.log(this.configCache);
@@ -508,6 +552,8 @@
                     console.log("Couldn't render Simkl stats", err);
                 });
 
+                SimklConfig.renderLibraries(userConfig.ExcludedLibraries);
+
                 for (const key in userConfig) {
                     const chk = document.querySelector("#configOptionsContainer input[type=checkbox]#" + key);
                     if (chk) {
@@ -519,6 +565,30 @@
                         input.value = userConfig[key];
                     }
                 }
+            },
+            // Library list is server-wide, so it can be fetched as the admin
+            // viewing the page whichever profile is being configured.
+            renderLibraries: function (excluded) {
+                const box = document.querySelector('#excludedLibraries');
+                box.innerHTML = '';
+                const chosen = (excluded || []).map(function (x) { return String(x).toLowerCase(); });
+
+                return SimklAPI.getLibraries().then(function (libraries) {
+                    (libraries || []).forEach(function (library) {
+                        const label = document.createElement('label');
+                        const input = document.createElement('input');
+                        input.type = 'checkbox';
+                        input.value = library.Id;
+                        input.checked = chosen.indexOf(String(library.Id).toLowerCase()) !== -1;
+                        const span = document.createElement('span');
+                        span.innerText = library.Name || library.Id;
+                        label.appendChild(input);
+                        label.appendChild(span);
+                        box.appendChild(label);
+                    });
+                }).catch(function (err) {
+                    console.log("Couldn't list libraries", err);
+                });
             },
             renderStats: function (stats) {
                 const el = document.querySelector('#accountStats');
@@ -595,10 +665,12 @@
                     });
                     if (filter.length > 0) {
                         filter[0].UserToken = response.access_token;
+                        filter[0].LinkExpired = false;
                     } else {
                         this.configCache.UserConfigs.push({
                             Id: uguid,
-                            UserToken: response.access_token
+                            UserToken: response.access_token,
+                            LinkExpired: false
                         });
                     }
 
@@ -700,6 +772,21 @@
                     .catch(function (result) {
                         console.error(result);
                         Dashboard.alert("Something went wrong, see logs for more details");
+                    });
+            },
+            getLibraries: function () {
+                const request = {
+                    url: window.ApiClient.getUrl('Simkl/Me/Libraries'),
+                    type: 'GET',
+                    headers: {
+                        accept: 'application/json'
+                    }
+                }
+
+                return window.ApiClient.fetch(request)
+                    .catch(function (result) {
+                        console.log("Couldn't load libraries", result);
+                        return null;
                     });
             },
             getUserStats: function (secret) {

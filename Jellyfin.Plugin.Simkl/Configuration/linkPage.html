@@ -156,6 +156,23 @@
             width: 6rem;
         }
 
+        #simklSelfService .simkl-libs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+            gap: 0.35rem 0.9rem;
+            margin-top: 0.6rem;
+        }
+
+        #simklSelfService .simkl-libs label {
+            display: flex;
+            gap: 0.55rem;
+            align-items: center;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        #simklSelfService .simkl-libs input { flex: 0 0 auto; width: 1rem; height: 1rem; margin: 0; }
+
         #simklSelfService .simkl-toast { margin-top: 0.9rem; font-size: 0.88rem; color: var(--simkl-ok); }
 
         #simklSelfService [hidden] { display: none !important; }
@@ -179,8 +196,12 @@
     </div>
 
     <div id="simklNotLinked" class="simkl-card" hidden>
-        <span class="simkl-pill">Not linked</span>
-        <p class="simkl-muted">
+        <span class="simkl-pill" id="simklNotLinkedPill">Not linked</span>
+        <p class="simkl-muted" id="simklExpiredNote" hidden>
+            <strong>Simkl rejected your saved login, so it was removed.</strong>
+            Nothing has been scrobbled since. Link again to resume — your settings were kept.
+        </p>
+        <p class="simkl-muted" id="simklFirstTimeNote">
             You'll get a short code to enter on Simkl. Your Simkl password is never
             shared with this server.
         </p>
@@ -242,6 +263,13 @@
                     <span>Also remove from Simkl when unmarking</span>
                 </label>
                 <div class="simkl-hint">Off by default, to avoid accidental deletions.</div>
+            </div>
+            <div class="simkl-opt">
+                <div>Never scrobble from these libraries</div>
+                <div class="simkl-hint" style="margin-left:0;">
+                    Useful for home videos or anything you'd rather keep off Simkl.
+                </div>
+                <div id="simklLibraries" class="simkl-libs"></div>
             </div>
             <div class="simkl-opt simkl-row">
                 <label for="simklMinLength" class="simkl-grow">Minimum runtime (minutes)</label>
@@ -372,8 +400,37 @@
                 el('simklMinLength').value = (min === undefined || min === null) ? 5 : min;
             }
 
+            // Renders the library checkboxes, ticking the ones already excluded.
+            function renderLibraries(excluded) {
+                var box = el('simklLibraries');
+                box.innerHTML = '';
+                var chosen = (excluded || []).map(function (x) { return String(x).toLowerCase(); });
+
+                return api('/Simkl/Me/Libraries').then(function (libraries) {
+                    (libraries || []).forEach(function (library) {
+                        var id = pick(library, 'Id');
+                        var label = document.createElement('label');
+                        var input = document.createElement('input');
+                        input.type = 'checkbox';
+                        input.value = id;
+                        input.checked = chosen.indexOf(String(id).toLowerCase()) !== -1;
+                        var span = document.createElement('span');
+                        span.textContent = pick(library, 'Name') || id;
+                        label.appendChild(input);
+                        label.appendChild(span);
+                        box.appendChild(label);
+                    });
+                }).catch(function (err) {
+                    console.log("Couldn't list libraries", err);
+                });
+            }
+
             function render(status) {
                 if (!pick(status, 'Linked')) {
+                    var expired = !!pick(status, 'LinkExpired');
+                    el('simklExpiredNote').hidden = !expired;
+                    el('simklFirstTimeNote').hidden = expired;
+                    el('simklNotLinkedPill').textContent = expired ? 'Link expired' : 'Not linked';
                     show('simklNotLinked');
                     return;
                 }
@@ -390,7 +447,9 @@
                 el('simklLastScrobble').textContent = last
                     ? 'Last scrobble: ' + last
                     : 'No scrobble recorded yet.';
-                applyOptions(pick(status, 'Options'));
+                var options = pick(status, 'Options');
+                applyOptions(options);
+                renderLibraries(pick(options, 'ExcludedLibraries'));
                 show('simklLinked');
             }
 
@@ -477,7 +536,12 @@
             });
 
             el('simklSave').addEventListener('click', function () {
-                var body = { MinLength: parseInt(el('simklMinLength').value, 10) || 0 };
+                var body = {
+                    MinLength: parseInt(el('simklMinLength').value, 10) || 0,
+                    ExcludedLibraries: Array.prototype.slice
+                        .call(el('simklLibraries').querySelectorAll('input:checked'))
+                        .map(function (input) { return input.value; })
+                };
                 optionKeys.forEach(function (key) {
                     body[key] = el('simkl' + key).checked;
                 });

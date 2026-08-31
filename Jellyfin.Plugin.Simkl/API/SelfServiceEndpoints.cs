@@ -1,8 +1,10 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Simkl.API.Objects;
 using Jellyfin.Plugin.Simkl.API.Responses;
+using Jellyfin.Plugin.Simkl.Services;
 using MediaBrowser.Controller.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -27,6 +29,7 @@ namespace Jellyfin.Plugin.Simkl.API
     {
         private readonly SimklApi _simklApi;
         private readonly IAuthorizationContext _authContext;
+        private readonly LibraryFilter _libraryFilter;
         private readonly ILogger<SelfServiceEndpoints> _logger;
 
         /// <summary>
@@ -34,14 +37,17 @@ namespace Jellyfin.Plugin.Simkl.API
         /// </summary>
         /// <param name="simklApi">Instance of the <see cref="SimklApi"/>.</param>
         /// <param name="authContext">Instance of the <see cref="IAuthorizationContext"/> interface.</param>
+        /// <param name="libraryFilter">Instance of the <see cref="LibraryFilter"/>.</param>
         /// <param name="logger">Instance of the <see cref="ILogger{SelfServiceEndpoints}"/> interface.</param>
         public SelfServiceEndpoints(
             SimklApi simklApi,
             IAuthorizationContext authContext,
+            LibraryFilter libraryFilter,
             ILogger<SelfServiceEndpoints> logger)
         {
             _simklApi = simklApi;
             _authContext = authContext;
+            _libraryFilter = libraryFilter;
             _logger = logger;
         }
 
@@ -123,6 +129,7 @@ namespace Jellyfin.Plugin.Simkl.API
             return Ok(new
             {
                 Linked = linked,
+                LinkExpired = config?.LinkExpired ?? false,
                 SimklName = simklName,
                 SimklPlan = simklPlan,
                 LastScrobble = config?.LastScrobble,
@@ -133,9 +140,29 @@ namespace Jellyfin.Plugin.Simkl.API
                     ScrobbleShows = config?.ScrobbleShows ?? true,
                     SyncMarkPlayed = config?.SyncMarkPlayed ?? true,
                     SyncMarkUnplayed = config?.SyncMarkUnplayed ?? false,
-                    MinLength = config?.MinLength ?? 5
+                    MinLength = config?.MinLength ?? 5,
+                    ExcludedLibraries = config?.ExcludedLibraries ?? Array.Empty<string>()
                 }
             });
+        }
+
+        /// <summary>
+        /// Lists the server's libraries, so the page can offer them as exclusions.
+        /// </summary>
+        /// <returns>The libraries, as id and name.</returns>
+        [HttpGet("Me/Libraries")]
+        public async Task<ActionResult> GetLibraries()
+        {
+            var userId = await GetCallerId().ConfigureAwait(false);
+            if (userId == null)
+            {
+                return Unauthorized();
+            }
+
+            return Ok(_libraryFilter.GetLibraries()
+                .Where(l => l.ItemId != null)
+                .Select(l => new { Id = l.ItemId, l.Name })
+                .ToArray());
         }
 
         /// <summary>
@@ -186,7 +213,9 @@ namespace Jellyfin.Plugin.Simkl.API
                 return Ok(new { Linked = false, Pending = false });
             }
 
-            plugin.Configuration.GetOrCreate(userId.Value).UserToken = status.AccessToken;
+            var linked = plugin.Configuration.GetOrCreate(userId.Value);
+            linked.UserToken = status.AccessToken;
+            linked.LinkExpired = false;
             plugin.SaveConfiguration();
             _logger.LogInformation("Simkl account linked by user {UserId} from the self-service page", userId);
 
@@ -243,6 +272,7 @@ namespace Jellyfin.Plugin.Simkl.API
             config.SyncMarkPlayed = options.SyncMarkPlayed;
             config.SyncMarkUnplayed = options.SyncMarkUnplayed;
             config.MinLength = Math.Clamp(options.MinLength, 0, 600);
+            config.ExcludedLibraries = options.ExcludedLibraries?.ToArray() ?? Array.Empty<string>();
             plugin.SaveConfiguration();
 
             return NoContent();

@@ -62,6 +62,10 @@ namespace Jellyfin.Plugin.Simkl.Configuration
                 if (config.UserToken == userToken)
                 {
                     config.UserToken = string.Empty;
+
+                    // Remember why the token went away, so the pages can tell the
+                    // user to link again instead of silently looking logged out.
+                    config.LinkExpired = true;
                 }
             }
 

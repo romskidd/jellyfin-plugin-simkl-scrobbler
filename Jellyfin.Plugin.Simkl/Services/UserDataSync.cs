@@ -40,6 +40,7 @@ namespace Jellyfin.Plugin.Simkl.Services
         private readonly ILibraryManager _libraryManager;
         private readonly ILogger<UserDataSync> _logger;
         private readonly SimklApi _simklApi;
+        private readonly LibraryFilter _libraryFilter;
         private readonly object _pendingLock = new object();
         private readonly Dictionary<Guid, PendingItems> _pending;
         private readonly Timer _flushTimer;
@@ -51,16 +52,19 @@ namespace Jellyfin.Plugin.Simkl.Services
         /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
         /// <param name="logger">Instance of the <see cref="ILogger{UserDataSync}"/> interface.</param>
         /// <param name="simklApi">Instance of the <see cref="SimklApi"/>.</param>
+        /// <param name="libraryFilter">Instance of the <see cref="LibraryFilter"/>.</param>
         public UserDataSync(
             IUserDataManager userDataManager,
             ILibraryManager libraryManager,
             ILogger<UserDataSync> logger,
-            SimklApi simklApi)
+            SimklApi simklApi,
+            LibraryFilter libraryFilter)
         {
             _userDataManager = userDataManager;
             _libraryManager = libraryManager;
             _logger = logger;
             _simklApi = simklApi;
+            _libraryFilter = libraryFilter;
             _pending = new Dictionary<Guid, PendingItems>();
             _flushTimer = new Timer(OnFlushTimer, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         }
@@ -106,6 +110,11 @@ namespace Jellyfin.Plugin.Simkl.Services
                 }
 
                 if (item is Movie ? !userConfig.ScrobbleMovies : !userConfig.ScrobbleShows)
+                {
+                    return;
+                }
+
+                if (_libraryFilter.IsExcluded(userConfig, item.Path))
                 {
                     return;
                 }

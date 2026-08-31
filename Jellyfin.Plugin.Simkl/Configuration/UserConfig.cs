@@ -22,6 +22,7 @@ namespace Jellyfin.Plugin.Simkl.Configuration
             ScrobbleTimeout = 30;
             SyncMarkPlayed = true;
             SyncMarkUnplayed = false;
+            ExcludedLibraries = Array.Empty<string>();
         }
 
         /// <summary>
@@ -90,6 +91,18 @@ namespace Jellyfin.Plugin.Simkl.Configuration
         /// attempt, shown on the configuration page.
         /// </summary>
         public string? LastScrobble { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the Simkl token was rejected
+        /// and removed. The user has to link again; without this the removal is
+        /// silent and scrobbling appears to work while it no longer does.
+        /// </summary>
+        public bool LinkExpired { get; set; }
+
+        /// <summary>
+        /// Gets or sets the ids of the Jellyfin libraries that are never scrobbled.
+        /// </summary>
+        public string[] ExcludedLibraries { get; set; }
 
         /// <summary>
         /// Gets or sets user id.

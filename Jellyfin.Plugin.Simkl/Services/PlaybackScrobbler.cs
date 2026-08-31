@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.Simkl.API;
 using Jellyfin.Plugin.Simkl.API.Exceptions;
+using Jellyfin.Plugin.Simkl.API.Objects;
 using Jellyfin.Plugin.Simkl.Configuration;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Session;
@@ -30,6 +31,10 @@ namespace Jellyfin.Plugin.Simkl.Services
     /// </remarks>
     public class PlaybackScrobbler : IHostedService
     {
+        // A stop past this much is a finished watch worth retrying if Simkl
+        // didn't confirm it; below, losing the event costs nothing.
+        private const double RetryThreshold = 80d;
+
         // Skip re-sending the same action for the same item within this window
         // to stay clear of the server's 20-second per-user lock.
         private static readonly TimeSpan _minActionInterval = TimeSpan.FromSeconds(20);
@@ -38,6 +43,8 @@ namespace Jellyfin.Plugin.Simkl.Services
         private readonly ILogger<PlaybackScrobbler> _logger;
         private readonly SimklApi _simklApi;
         private readonly ILibraryManager _libraryManager;
+        private readonly LibraryFilter _libraryFilter;
+        private readonly ScrobbleRetryQueue _retryQueue;
         private readonly ConcurrentDictionary<string, SessionState> _sessions;
 
         /// <summary>
@@ -47,16 +54,22 @@ namespace Jellyfin.Plugin.Simkl.Services
         /// <param name="logger">Instance of the <see cref="ILogger{PlaybackScrobbler}"/> interface.</param>
         /// <param name="simklApi">Instance of the <see cref="SimklApi"/>.</param>
         /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
+        /// <param name="libraryFilter">Instance of the <see cref="LibraryFilter"/>.</param>
+        /// <param name="retryQueue">Instance of the <see cref="ScrobbleRetryQueue"/>.</param>
         public PlaybackScrobbler(
             ISessionManager sessionManager,
             ILogger<PlaybackScrobbler> logger,
             SimklApi simklApi,
-            ILibraryManager libraryManager)
+            ILibraryManager libraryManager,
+            LibraryFilter libraryFilter,
+            ScrobbleRetryQueue retryQueue)
         {
             _sessionManager = sessionManager;
             _logger = logger;
             _simklApi = simklApi;
             _libraryManager = libraryManager;
+            _libraryFilter = libraryFilter;
+            _retryQueue = retryQueue;
             _sessions = new ConcurrentDictionary<string, SessionState>();
         }
 
@@ -236,6 +249,10 @@ namespace Jellyfin.Plugin.Simkl.Services
             {
                 skipReason = "item filtered by type/length";
             }
+            else if (_libraryFilter.IsExcluded(userConfig, e.MediaInfo.Path))
+            {
+                skipReason = "item is in a library excluded by " + session.UserName;
+            }
 
             // Record the session up front, eligible or not, so progress ticks recognise
             // it and stop reprocessing.
@@ -290,6 +307,11 @@ namespace Jellyfin.Plugin.Simkl.Services
                 return false;
             }
 
+            if (_libraryFilter.IsExcluded(userConfig, mediaInfo.Path))
+            {
+                return false;
+            }
+
             // Debounce duplicate calls to dodge the 20s lock. Stop is never debounced.
             if (!force && action != SimklScrobbleAction.Stop
                 && _sessions.TryGetValue(session.Id, out var state)
@@ -309,14 +331,20 @@ namespace Jellyfin.Plugin.Simkl.Services
                     progress,
                     session.UserName);
 
+                var seriesIds = ResolveSeriesProviderIds(mediaInfo);
                 var success = await _simklApi.ScrobbleAsync(
-                        action, mediaInfo, progress, userConfig.UserToken, ResolveSeriesProviderIds(mediaInfo))
+                        action, mediaInfo, progress, userConfig.UserToken, seriesIds)
                     .ConfigureAwait(false);
 
                 if (success && _sessions.TryGetValue(session.Id, out var s))
                 {
                     s.LastAction = action;
                     s.LastSent = DateTime.UtcNow;
+                }
+
+                if (!success)
+                {
+                    QueueForRetry(action, mediaInfo, progress, userId, seriesIds);
                 }
 
                 RecordLastScrobble(userConfig, action, mediaInfo, progress, success);
@@ -333,9 +361,51 @@ namespace Jellyfin.Plugin.Simkl.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Caught unknown exception while trying to scrobble");
+                QueueForRetry(action, mediaInfo, progress, userId, ResolveSeriesProviderIds(mediaInfo));
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Keeps a finished watch that Simkl didn't confirm, so the retry queue
+        /// can replay it. Only full watches are worth queuing: anything below the
+        /// watched threshold would not have been recorded anyway.
+        /// </summary>
+        private void QueueForRetry(
+            SimklScrobbleAction action,
+            MediaBrowser.Model.Dto.BaseItemDto item,
+            double progress,
+            Guid userId,
+            Dictionary<string, string>? seriesProviderIds)
+        {
+            if (action != SimklScrobbleAction.Stop || progress < RetryThreshold)
+            {
+                return;
+            }
+
+            var isMovie = item.IsMovie == true || item.Type == BaseItemKind.Movie;
+            var ids = isMovie ? item.ProviderIds : seriesProviderIds ?? item.ProviderIds;
+            if (ids == null || ids.Count == 0)
+            {
+                // Without ids a replay can't be matched; the filename fallback
+                // already had its chance during the live attempt.
+                return;
+            }
+
+            _retryQueue.Enqueue(new PendingScrobble
+            {
+                UserId = userId,
+                IsMovie = isMovie,
+                Name = item.Name,
+                Title = isMovie ? item.Name : item.SeriesName,
+                Year = item.ProductionYear,
+                ProviderIds = new Dictionary<string, string>(ids, StringComparer.OrdinalIgnoreCase),
+                Season = isMovie ? null : item.ParentIndexNumber,
+                Episode = isMovie ? null : item.IndexNumber,
+                FirstFailedUtc = DateTime.UtcNow,
+                Attempts = 0
+            });
         }
 
         /// <summary>
