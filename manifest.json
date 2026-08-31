@@ -9,6 +9,14 @@
         "imageUrl": "",
         "versions": [
             {
+                "version": "9.3.0.0",
+                "changelog": "Self-service linking: any Jellyfin user can now connect their own Simkl account from a page of their own, without dashboard access (the admin settings page shows the link to share; the optional Plugin Pages plugin also adds it to the user sidebar, but is never required). Watches that Simkl doesn't confirm are queued and replayed for up to 24 hours, surviving a server restart, so a network blip no longer loses an episode. Per-user library exclusions. An expired Simkl login is now reported instead of failing silently. The plugin appears in the dashboard sidebar and the settings page was redesigned.",
+                "targetAbi": "10.11.7.0",
+                "sourceUrl": "https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/releases/download/V9.3.0.0/Simkl_Scrobbler_9.3.0.0.zip",
+                "checksum": "8a0c41fc7ed412319f16209e87ad5a9d",
+                "timestamp": "2026-08-31T20:30:00Z"
+            },
+            {
                 "version": "9.2.0.2",
                 "changelog": "Manual check marks now sync to Simkl: ticking an episode, a season or a movie as played adds it to your history (batched per season), and optionally unticking removes it (off by default). The settings page shows your Simkl watch statistics, account type and the last scrobble result, and the profile selector now opens on the logged-in user. Every API request now identifies the app to Simkl (app-name/app-version), as required since April 2026. Replaces the broken 9.2.0.0.",
                 "targetAbi": "10.11.7.0",
