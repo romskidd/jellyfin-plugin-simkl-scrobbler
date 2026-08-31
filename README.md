@@ -82,6 +82,3 @@ https://raw.githubusercontent.com/romskidd/jellyfin-plugin-simkl-scrobbler/maste
 | **9.0.0.0** | 2026-05-22 | First fork release: real-time scrobbling (`start`/`pause`/`stop` lifecycle, "Watching now" banner, server-side watched-marking at 80%), settings toggles, filename fallback. |
 | ≤ 8.0.0.0 | — | Upstream history: see the [official plugin releases](https://github.com/jellyfin/jellyfin-plugin-simkl/releases). |
 
-## Future features
-- Sync all watch status with Simkl
-- Cross-device "Continue Watching" discovery via `/sync/playback`
