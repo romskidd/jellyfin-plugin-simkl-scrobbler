@@ -44,7 +44,13 @@ namespace Jellyfin.Plugin.Simkl
             yield return new PluginPageInfo
             {
                 Name = Name,
-                EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.html"
+                EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.html",
+
+                // Show the plugin in the dashboard's left sidebar instead of
+                // hiding it behind the plugin catalogue.
+                EnableInMainMenu = true,
+                DisplayName = "Simkl Scrobbler",
+                MenuIcon = "sync"
             };
         }
     }

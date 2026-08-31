@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
     <title>Simkl Scrobbler</title>
@@ -8,91 +8,321 @@
      data-require="emby-button,emby-checkbox,emby-input,emby-select">
     <div data-role="content">
         <div class="content-primary">
-            <h1>Simkl Scrobbler</h1>
+            <style>
+                /* Scoped to this page so nothing leaks into the rest of the dashboard.
+                   Colours are expressed as translucent greys so the page follows
+                   whatever Jellyfin theme (dark or light) is active. */
+                #SimklConfigurationPage .simklHeader {
+                    display: flex;
+                    align-items: center;
+                    flex-wrap: wrap;
+                    gap: 0.6em 1em;
+                    margin: 0 0 1.6em;
+                    padding-left: 0.9em;
+                    border-left: 4px solid;
+                    border-image: linear-gradient(180deg, #aa5cc3, #00a4dc) 1;
+                }
+
+                #SimklConfigurationPage .simklHeader h1 {
+                    margin: 0;
+                    font-weight: 500;
+                }
+
+                #SimklConfigurationPage .simklTagline {
+                    margin: 0.15em 0 0;
+                    opacity: 0.6;
+                    font-size: 0.92em;
+                }
+
+                #SimklConfigurationPage .simklPill {
+                    margin-left: auto;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.5em;
+                    padding: 0.32em 0.85em;
+                    border-radius: 999px;
+                    font-size: 0.82em;
+                    white-space: nowrap;
+                    background: rgba(127, 127, 127, 0.16);
+                    border: 1px solid rgba(127, 127, 127, 0.25);
+                }
+
+                #SimklConfigurationPage .simklPill::before {
+                    content: '';
+                    width: 0.55em;
+                    height: 0.55em;
+                    border-radius: 50%;
+                    background: currentColor;
+                    opacity: 0.55;
+                }
+
+                #SimklConfigurationPage .simklPill.is-on {
+                    color: #3fbf7f;
+                    border-color: rgba(63, 191, 127, 0.45);
+                    background: rgba(63, 191, 127, 0.12);
+                }
+
+                #SimklConfigurationPage .simklPill.is-on::before {
+                    opacity: 1;
+                }
+
+                #SimklConfigurationPage .simklCard {
+                    margin-bottom: 1.1em;
+                    padding: 1.15em 1.3em;
+                    border-radius: 10px;
+                    background: rgba(127, 127, 127, 0.08);
+                    border: 1px solid rgba(127, 127, 127, 0.18);
+                }
+
+                #SimklConfigurationPage .simklCardTitle {
+                    margin: 0 0 0.9em;
+                    font-size: 0.78em;
+                    font-weight: 600;
+                    letter-spacing: 0.09em;
+                    text-transform: uppercase;
+                    opacity: 0.55;
+                }
+
+                #SimklConfigurationPage .simklAccountRow {
+                    display: flex;
+                    align-items: center;
+                    flex-wrap: wrap;
+                    gap: 0.8em;
+                }
+
+                #SimklConfigurationPage .simklAccountRow .simklGrow {
+                    flex: 1 1 14em;
+                    min-width: 0;
+                }
+
+                #SimklConfigurationPage .simklHello {
+                    font-size: 1.15em;
+                    font-weight: 500;
+                }
+
+                #SimklConfigurationPage .simklMuted {
+                    opacity: 0.6;
+                    font-size: 0.87em;
+                    margin-top: 0.25em;
+                    word-break: break-word;
+                }
+
+                #SimklConfigurationPage .simklLogout {
+                    width: auto !important;
+                    margin: 0 !important;
+                    flex: 0 0 auto;
+                }
+
+                #SimklConfigurationPage .simklStats {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(6.5em, 1fr));
+                    gap: 0.7em;
+                    margin-top: 1.1em;
+                }
+
+                #SimklConfigurationPage .simklStats:empty {
+                    display: none;
+                }
+
+                #SimklConfigurationPage .simklStat {
+                    padding: 0.7em 0.5em;
+                    text-align: center;
+                    border-radius: 8px;
+                    background: rgba(127, 127, 127, 0.1);
+                }
+
+                #SimklConfigurationPage .simklStatValue {
+                    font-size: 1.25em;
+                    font-weight: 500;
+                }
+
+                #SimklConfigurationPage .simklStatLabel {
+                    margin-top: 0.15em;
+                    font-size: 0.72em;
+                    letter-spacing: 0.06em;
+                    text-transform: uppercase;
+                    opacity: 0.55;
+                }
+
+                /* Give each option room to breathe and keep its description
+                   visually attached to its checkbox. */
+                #SimklConfigurationPage .simklOption + .simklOption {
+                    margin-top: 1.05em;
+                    padding-top: 1.05em;
+                    border-top: 1px solid rgba(127, 127, 127, 0.14);
+                }
+
+                #SimklConfigurationPage .simklOption .fieldDescription {
+                    margin-top: 0.3em;
+                    opacity: 0.6;
+                }
+
+                #SimklConfigurationPage .simklPinBox {
+                    margin: 0.9em 0;
+                    padding: 0.9em;
+                    text-align: center;
+                    border-radius: 10px;
+                    background: rgba(127, 127, 127, 0.12);
+                    border: 1px dashed rgba(127, 127, 127, 0.3);
+                }
+
+                #SimklConfigurationPage .simklPinBox h3 {
+                    margin: 0;
+                    font-size: 2em;
+                    font-weight: 600;
+                    letter-spacing: 0.22em;
+                }
+
+                #SimklConfigurationPage .simklActions {
+                    display: flex;
+                    gap: 0.8em;
+                    flex-wrap: wrap;
+                    margin-top: 1.4em;
+                }
+
+                #SimklConfigurationPage .simklActions .raised {
+                    flex: 1 1 12em;
+                    margin: 0 !important;
+                }
+            </style>
+
+            <div class="simklHeader">
+                <div>
+                    <h1>Simkl Scrobbler</h1>
+                    <p class="simklTagline">Real-time scrobbling — start, pause and stop, straight to Simkl.</p>
+                </div>
+                <span id="connectionPill" class="simklPill">Not connected</span>
+            </div>
+
             <form id="SimklConfigurationForm">
-                <div id="selectContainer">
-                    <select onchange="SimklConfig.onSelectorChange();" is="emby-select" id="user-selector"
-                            label="Showing plugin settings for...">
-                        <!-- This will be populated by SimklConfig.populateUsers -->
-                    </select>
+                <div class="simklCard">
+                    <div class="simklCardTitle">Jellyfin profile</div>
+                    <div id="selectContainer">
+                        <select onchange="SimklConfig.onSelectorChange();" is="emby-select" id="user-selector"
+                                label="Showing plugin settings for...">
+                            <!-- This will be populated by SimklConfig.populateUsers -->
+                        </select>
+                        <div class="fieldDescription">
+                            Each Jellyfin profile links its own Simkl account.
+                        </div>
+                    </div>
                 </div>
+
                 <div id="loginButtonContainer" hidden>
-                    <h3>It seems you are not logged in, do you wish to log in?</h3>
-                    <button onclick="SimklConfig.startLoginProcess();" is="emby-button" type="button"
-                            class="raised button-submit block"><span>Log In</span></button>
-                    <button onclick="location.href='https://simkl.com/';" is="emby-button" type="button"
-                            class="raised block"><span>Create an account</span></button>
+                    <div class="simklCard">
+                        <div class="simklCardTitle">Not linked yet</div>
+                        <p class="simklMuted" style="margin-top:0;">
+                            Link this profile to a Simkl account to start scrobbling. You'll get a
+                            short PIN to enter on simkl.com — no password is ever shared.
+                        </p>
+                        <div class="simklActions">
+                            <button onclick="SimklConfig.startLoginProcess();" is="emby-button" type="button"
+                                    class="raised button-submit block"><span>Log In</span></button>
+                            <button onclick="location.href='https://simkl.com/';" is="emby-button" type="button"
+                                    class="raised block"><span>Create an account</span></button>
+                        </div>
+                    </div>
                 </div>
+
                 <div id="loggingIn" hidden>
-                    <h2>Logging In</h2>
-                    <div id="loginText"></div>
-                    <h3 id="loginPin"></h3>
-                    <span id="loginSecondsRemaining">900</span> seconds remaining
-                    <button onclick="SimklConfig.stopLoginProcess();" is="emby-button" type="button"
-                            class="raised button-cancel block"><span>Cancel</span></button>
+                    <div class="simklCard">
+                        <div class="simklCardTitle">Waiting for authorisation</div>
+                        <div id="loginText"></div>
+                        <div class="simklPinBox">
+                            <h3 id="loginPin"></h3>
+                        </div>
+                        <div class="simklMuted" style="margin-top:0;">
+                            <span id="loginSecondsRemaining">900</span> seconds remaining
+                        </div>
+                        <div class="simklActions">
+                            <button onclick="SimklConfig.stopLoginProcess();" is="emby-button" type="button"
+                                    class="raised button-cancel block"><span>Cancel</span></button>
+                        </div>
+                    </div>
                 </div>
+
                 <div id="configOptionsContainer" hidden>
-                    <h3>Hello again <span id="simklName">USERNAME</span>!</h3>
-                    <div id="accountStats" class="fieldDescription" style="margin-bottom: 0.3em;"></div>
-                    <div id="lastScrobble" class="fieldDescription" style="margin-bottom: 1em;"></div>
-                    <button onclick="SimklConfig.logOut();" is="emby-button" type="button" class="raised button block">
-                        <span>Log Out</span></button>
-                    <h2>Scrobbling options:</h2>
-                    <div class="checkboxcontainer">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="EnablePlaybackScrobbling"/>
-                            <span>Real-time scrobbling ("Watching now" + auto mark watched)</span>
-                        </label>
-                        <div class="fieldDescription">
-                            Reports start, pause and stop to Simkl as you watch. The title shows
-                            in your "Watching now" banner and is marked watched automatically when
-                            you stop past 80%.
+                    <div class="simklCard">
+                        <div class="simklAccountRow">
+                            <div class="simklGrow">
+                                <div class="simklHello">Hello again <span id="simklName">USERNAME</span>!</div>
+                                <div id="lastScrobble" class="simklMuted"></div>
+                            </div>
+                            <button onclick="SimklConfig.logOut();" is="emby-button" type="button"
+                                    class="raised simklLogout"><span>Log Out</span></button>
+                        </div>
+                        <div id="accountStats" class="simklStats"></div>
+                    </div>
+
+                    <div class="simklCard">
+                        <div class="simklCardTitle">Scrobbling</div>
+                        <div class="simklOption">
+                            <div class="checkboxcontainer"><label>
+                                <input is="emby-checkbox" type="checkbox" id="EnablePlaybackScrobbling"/>
+                                <span>Real-time scrobbling ("Watching now" + auto mark watched)</span>
+                            </label></div>
+                            <div class="fieldDescription">
+                                Reports start, pause and stop to Simkl as you watch. The title shows
+                                in your "Watching now" banner and is marked watched automatically when
+                                you stop past 80%.
+                            </div>
+                        </div>
+                        <div class="simklOption">
+                            <div class="checkboxcontainer"><label>
+                                <input is="emby-checkbox" type="checkbox" id="ScrobbleMovies"/>
+                                <span>Scrobble Movies</span>
+                            </label></div>
+                        </div>
+                        <div class="simklOption">
+                            <div class="checkboxcontainer"><label>
+                                <input is="emby-checkbox" type="checkbox" id="ScrobbleShows"/>
+                                <span>Scrobble TV Shows</span>
+                            </label></div>
                         </div>
                     </div>
-                    <div class="checkboxcontainer">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="ScrobbleMovies"/>
-                            <span>Autoscrobbling Movies</span>
-                        </label>
-                    </div>
-                    <div class="checkboxcontainer">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="ScrobbleShows"/>
-                            <span>Autoscrobbling TV Shows</span>
-                        </label>
-                    </div>
-                    <div class="checkboxcontainer">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="SyncMarkPlayed"/>
-                            <span>Sync manual "mark played" to Simkl</span>
-                        </label>
-                        <div class="fieldDescription">
-                            When you tick an episode, season or movie as played in Jellyfin,
-                            it is added to your Simkl history (bulk actions are batched into
-                            a single request).
+
+                    <div class="simklCard">
+                        <div class="simklCardTitle">Manual check marks</div>
+                        <div class="simklOption">
+                            <div class="checkboxcontainer"><label>
+                                <input is="emby-checkbox" type="checkbox" id="SyncMarkPlayed"/>
+                                <span>Sync manual "mark played" to Simkl</span>
+                            </label></div>
+                            <div class="fieldDescription">
+                                When you tick an episode, season or movie as played in Jellyfin,
+                                it is added to your Simkl history (bulk actions are batched into
+                                a single request).
+                            </div>
+                        </div>
+                        <div class="simklOption">
+                            <div class="checkboxcontainer"><label>
+                                <input is="emby-checkbox" type="checkbox" id="SyncMarkUnplayed"/>
+                                <span>Also remove from Simkl when unmarking</span>
+                            </label></div>
+                            <div class="fieldDescription">
+                                When you untick an item, it is removed from your Simkl history.
+                                Off by default to avoid accidental deletions.
+                            </div>
                         </div>
                     </div>
-                    <div class="checkboxcontainer">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="SyncMarkUnplayed"/>
-                            <span>Also remove from Simkl when unmarking</span>
-                        </label>
-                        <div class="fieldDescription">
-                            When you untick an item, it is removed from your Simkl history.
-                            Off by default to avoid accidental deletions.
+
+                    <div class="simklCard">
+                        <div class="simklCardTitle">Filter</div>
+                        <div class="inputContainer" style="margin-bottom:0;">
+                            <input is="emby-input" id="MinLength" type="number" min="0" pattern="[0-9]*"
+                                   label="Minimum runtime (minutes):"/>
+                            <div class="fieldDescription">
+                                Items shorter than this are never scrobbled.
+                            </div>
                         </div>
                     </div>
-                    <div class="inputContainer">
-                        <input is="emby-input" id="MinLength" type="number" min="0" pattern="[0-9]*"
-                               label="Minimum runtime (minutes):"/>
-                        <div class="fieldDescription">
-                            Items shorter than this are never scrobbled
-                        </div>
+
+                    <div class="simklActions">
+                        <button is="emby-button" type="submit" class="raised button-submit block">
+                            <span>${Save}</span></button>
+                        <button is="emby-button" type="button" class="raised block" onclick="history.back();">
+                            <span>${Cancel}</span></button>
                     </div>
-                    <button is="emby-button" type="submit" class="raised button-submit block"><span>${Save}</span>
-                    </button>
-                    <button is="emby-button" type="button" class="raised block" onclick="history.back();"><span>${Cancel}</span>
-                    </button>
                 </div>
             </form>
         </div>
@@ -114,6 +344,7 @@
             loginText: document.querySelector('#loginText'),
             loginPin: document.querySelector('#loginPin'),
             loggingIn: document.querySelector('#loggingIn'),
+            connectionPill: document.querySelector('#connectionPill'),
 
             populateUsers: async function (users) {
                 users.forEach(function (user) {
@@ -132,6 +363,14 @@
                     }
                 }
             },
+            setConnectionPill: function (text, connected) {
+                if (!SimklConfig.connectionPill) {
+                    return;
+                }
+
+                SimklConfig.connectionPill.innerText = text;
+                SimklConfig.connectionPill.classList.toggle('is-on', !!connected);
+            },
             loadConfig: async function (user, config) {
                 if (config != null) {
                     this.configCache = config;
@@ -149,6 +388,7 @@
                     SimklConfig.configOptionsContainer.removeAttribute('hidden');
                     await this.populateOptionsContainer(config.UserConfigs.filter(e => e.Id === user)[0]);
                 } else {
+                    SimklConfig.setConnectionPill('Not connected', false);
                     SimklConfig.loginButtonContainer.removeAttribute('hidden');
                 }
             },
@@ -178,11 +418,13 @@
                 try {
                     const settings = await SimklAPI.getUserSettings(userConfig.Id);
                     const name = (settings && settings.user && settings.user.name) ? settings.user.name : 'Simkl user';
-                    const type = (settings && settings.account && settings.account.type) ? ' (' + settings.account.type.toUpperCase() + ')' : '';
-                    SimklConfig.simklName.innerText = name + type;
+                    const plan = (settings && settings.account && settings.account.type) ? settings.account.type.toUpperCase() : null;
+                    SimklConfig.simklName.innerText = name;
+                    SimklConfig.setConnectionPill(plan ? 'Connected · ' + plan : 'Connected', true);
                 } catch (err) {
                     console.error("Couldn't load Simkl user settings", err);
                     SimklConfig.simklName.innerText = 'Simkl user';
+                    SimklConfig.setConnectionPill('Connected', true);
                 }
 
                 const lastScrobbleEl = document.querySelector('#lastScrobble');
@@ -190,10 +432,8 @@
                     ? 'Last scrobble: ' + userConfig.LastScrobble
                     : 'No scrobble recorded yet on this server.';
 
-                const statsEl = document.querySelector('#accountStats');
-                statsEl.innerText = '';
                 SimklAPI.getUserStats(userConfig.Id).then(function (stats) {
-                    statsEl.innerText = SimklConfig.formatStats(stats);
+                    SimklConfig.renderStats(stats);
                 }).catch(function (err) {
                     console.log("Couldn't render Simkl stats", err);
                 });
@@ -210,6 +450,41 @@
                     }
                 }
             },
+            renderStats: function (stats) {
+                const el = document.querySelector('#accountStats');
+                el.innerHTML = '';
+                if (!stats) {
+                    return;
+                }
+
+                const mins = function (o) {
+                    return (o && typeof o.total_mins === 'number') ? o.total_mins : null;
+                };
+                const fmt = function (m) {
+                    const hours = m / 60;
+                    return hours >= 72 ? Math.round(hours / 24) + ' d' : Math.round(hours) + ' h';
+                };
+
+                const tiles = [];
+                if (mins(stats) != null) tiles.push(['Total', fmt(mins(stats))]);
+                if (mins(stats.movies) != null) tiles.push(['Movies', fmt(mins(stats.movies))]);
+                if (mins(stats.tv) != null) tiles.push(['TV', fmt(mins(stats.tv))]);
+                if (mins(stats.anime) != null) tiles.push(['Anime', fmt(mins(stats.anime))]);
+
+                tiles.forEach(function (tile) {
+                    const box = document.createElement('div');
+                    box.className = 'simklStat';
+                    const value = document.createElement('div');
+                    value.className = 'simklStatValue';
+                    value.innerText = tile[1];
+                    const label = document.createElement('div');
+                    label.className = 'simklStatLabel';
+                    label.innerText = tile[0];
+                    box.appendChild(value);
+                    box.appendChild(label);
+                    el.appendChild(box);
+                });
+            },
             startLoginProcess: async function () {
                 this.onLoginProcess = true;
 
@@ -223,7 +498,7 @@
                     SimklConfig.loginSecondsRemaining.innerText = Math.round((SimklConfig.finish.getTime() - (new Date().getTime())) / 1000);
                 }, 1000);
 
-                SimklConfig.loginText.innerHTML = 'Please visit <a href="' + code.verification_url + '/' + code.user_code + '" target="_blank">' + code.verification_url + '</a> on your phone or compouter and enter the following code:';
+                SimklConfig.loginText.innerHTML = 'Visit <a href="' + code.verification_url + '/' + code.user_code + '" target="_blank">' + code.verification_url + '</a> on your phone or computer and enter this code:';
 
                 SimklConfig.loginPin.innerText = code.user_code;
 
@@ -271,26 +546,6 @@
                 window.clearInterval(this.remainingTimer);
                 SimklConfig.loginButtonContainer.removeAttribute('hidden');
                 SimklConfig.loggingIn.setAttribute('hidden', '');
-            },
-            formatStats: function (stats) {
-                if (!stats) {
-                    return '';
-                }
-
-                const mins = function (o) {
-                    return (o && typeof o.total_mins === 'number') ? o.total_mins : null;
-                };
-                const fmt = function (m) {
-                    const h = m / 60;
-                    return h >= 72 ? Math.round(h / 24) + ' days' : Math.round(h) + ' h';
-                };
-
-                const parts = [];
-                if (mins(stats) != null) parts.push('total ' + fmt(mins(stats)));
-                if (mins(stats.movies) != null) parts.push('movies ' + fmt(mins(stats.movies)));
-                if (mins(stats.tv) != null) parts.push('TV ' + fmt(mins(stats.tv)));
-                if (mins(stats.anime) != null) parts.push('anime ' + fmt(mins(stats.anime)));
-                return parts.length > 0 ? 'Watched on Simkl: ' + parts.join(' · ') : '';
             },
             onSelectorChange: async function () {
                 if (this.onLoginProcess) {
