@@ -1,5 +1,5 @@
 <h1 align="center">Simkl Scrobbler for Jellyfin</h1>
-<h3 align="center">Real-time Simkl scrobbling — added with the help of Claude</h3>
+<h3 align="center">Real-time Simkl scrobbling</h3>
 
 > [!WARNING]
 > **Installed a version ≤ 9.0.0.4 of this plugin (before 2026-08-30)?**
