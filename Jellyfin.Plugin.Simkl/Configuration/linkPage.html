@@ -1,64 +1,49 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <title>Link your Simkl account</title>
+<div id="simklSelfService">
     <style>
-        :root {
-            color-scheme: dark light;
-            --bg: #101418;
-            --card: rgba(255, 255, 255, 0.05);
-            --line: rgba(255, 255, 255, 0.14);
-            --fg: #f2f4f6;
-            --muted: rgba(242, 244, 246, 0.62);
-            --accent: #00a4dc;
-            --ok: #3fbf7f;
-        }
-
-        @media (prefers-color-scheme: light) {
-            :root {
-                --bg: #f4f6f8;
-                --card: rgba(0, 0, 0, 0.035);
-                --line: rgba(0, 0, 0, 0.12);
-                --fg: #16191c;
-                --muted: rgba(22, 25, 28, 0.62);
-            }
-        }
-
-        * { box-sizing: border-box; }
-
-        body {
-            margin: 0;
-            padding: 2.2rem 1.1rem 3rem;
-            background: var(--bg);
-            color: var(--fg);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        /* Everything is scoped to #simklSelfService: this markup is also injected
+           straight into the Jellyfin web client (via Plugin Pages), where a stray
+           global rule would restyle the whole UI. */
+        #simklSelfService {
+            --simkl-card: rgba(127, 127, 127, 0.09);
+            --simkl-line: rgba(127, 127, 127, 0.25);
+            --simkl-muted: rgba(127, 127, 127, 1);
+            --simkl-accent: #00a4dc;
+            --simkl-ok: #3fbf7f;
+            max-width: 33rem;
+            margin: 0 auto;
             line-height: 1.5;
         }
 
-        .wrap { max-width: 33rem; margin: 0 auto; }
+        #simklSelfService * { box-sizing: border-box; }
 
-        header {
+        #simklSelfService .simkl-head {
             padding-left: 0.85rem;
             border-left: 4px solid;
-            border-image: linear-gradient(180deg, #aa5cc3, var(--accent)) 1;
-            margin-bottom: 1.6rem;
+            border-image: linear-gradient(180deg, #aa5cc3, var(--simkl-accent)) 1;
+            margin-bottom: 1.5rem;
         }
 
-        h1 { margin: 0; font-size: 1.5rem; font-weight: 600; }
+        #simklSelfService .simkl-head h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
 
-        .tagline { margin: 0.2rem 0 0; color: var(--muted); font-size: 0.93rem; }
+        #simklSelfService .simkl-tagline {
+            margin: 0.2rem 0 0;
+            opacity: 0.65;
+            font-size: 0.93rem;
+        }
 
-        .card {
-            background: var(--card);
-            border: 1px solid var(--line);
+        #simklSelfService .simkl-card {
+            background: var(--simkl-card);
+            border: 1px solid var(--simkl-line);
             border-radius: 12px;
             padding: 1.15rem 1.25rem;
             margin-bottom: 1rem;
         }
 
-        .pill {
+        #simklSelfService .simkl-pill {
             display: inline-flex;
             align-items: center;
             gap: 0.5em;
@@ -66,10 +51,10 @@
             border-radius: 999px;
             font-size: 0.88rem;
             background: rgba(127, 127, 127, 0.16);
-            border: 1px solid var(--line);
+            border: 1px solid var(--simkl-line);
         }
 
-        .pill::before {
+        #simklSelfService .simkl-pill::before {
             content: '';
             flex: 0 0 auto;
             width: 0.55em;
@@ -79,412 +64,439 @@
             opacity: 0.55;
         }
 
-        .pill.on {
-            color: var(--ok);
+        #simklSelfService .simkl-pill.on {
+            color: var(--simkl-ok);
             background: rgba(63, 191, 127, 0.12);
             border-color: rgba(63, 191, 127, 0.45);
         }
 
-        .pill.on::before { opacity: 1; }
+        #simklSelfService .simkl-pill.on::before { opacity: 1; }
 
-        .muted { color: var(--muted); font-size: 0.88rem; }
+        #simklSelfService .simkl-muted { opacity: 0.65; font-size: 0.88rem; }
 
-        button {
+        #simklSelfService .simkl-btn {
             font: inherit;
             font-weight: 500;
-            color: var(--fg);
-            background: rgba(127, 127, 127, 0.16);
-            border: 1px solid var(--line);
+            color: inherit;
+            background: rgba(127, 127, 127, 0.18);
+            border: 1px solid var(--simkl-line);
             border-radius: 8px;
             padding: 0.62em 1.1em;
             cursor: pointer;
         }
 
-        button:hover { background: rgba(127, 127, 127, 0.26); }
+        #simklSelfService .simkl-btn:hover { background: rgba(127, 127, 127, 0.3); }
 
-        button.primary {
-            background: var(--accent);
+        #simklSelfService .simkl-btn.primary {
+            background: var(--simkl-accent);
             border-color: transparent;
             color: #fff;
         }
 
-        button.primary:hover { filter: brightness(1.1); }
+        #simklSelfService .simkl-actions {
+            display: flex;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
 
-        button[disabled] { opacity: 0.55; cursor: default; }
-
-        .actions { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 1rem; }
-
-        .pin {
+        #simklSelfService .simkl-pin {
             margin: 1rem 0;
             padding: 0.9rem;
             text-align: center;
             border-radius: 10px;
-            border: 1px dashed var(--line);
+            border: 1px dashed var(--simkl-line);
             background: rgba(127, 127, 127, 0.1);
             font-size: 2rem;
             font-weight: 700;
             letter-spacing: 0.22em;
         }
 
-        .opt { display: block; padding: 0.55rem 0; }
+        #simklSelfService .simkl-opt { display: block; padding: 0.6rem 0; }
 
-        .opt + .opt { border-top: 1px solid var(--line); }
+        #simklSelfService .simkl-opt + .simkl-opt { border-top: 1px solid var(--simkl-line); }
 
-        .opt label { display: flex; gap: 0.65rem; align-items: flex-start; cursor: pointer; }
+        #simklSelfService .simkl-opt label {
+            display: flex;
+            gap: 0.65rem;
+            align-items: flex-start;
+            cursor: pointer;
+            margin: 0;
+        }
 
-        .opt input[type=checkbox] { margin-top: 0.28rem; flex: 0 0 auto; width: 1rem; height: 1rem; }
+        #simklSelfService .simkl-opt input[type=checkbox] {
+            margin: 0.3rem 0 0;
+            flex: 0 0 auto;
+            width: 1rem;
+            height: 1rem;
+        }
 
-        .opt .hint { color: var(--muted); font-size: 0.83rem; margin-left: 1.65rem; }
+        #simklSelfService .simkl-hint {
+            opacity: 0.65;
+            font-size: 0.83rem;
+            margin-left: 1.65rem;
+        }
 
-        .row { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
+        #simklSelfService .simkl-row {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            flex-wrap: wrap;
+        }
 
-        .row .grow { flex: 1 1 12rem; min-width: 0; }
+        #simklSelfService .simkl-grow { flex: 1 1 12rem; min-width: 0; }
 
-        input[type=number] {
+        #simklSelfService input[type=number] {
             font: inherit;
-            color: var(--fg);
-            background: rgba(127, 127, 127, 0.12);
-            border: 1px solid var(--line);
+            color: inherit;
+            background: rgba(127, 127, 127, 0.14);
+            border: 1px solid var(--simkl-line);
             border-radius: 8px;
             padding: 0.5em 0.7em;
             width: 6rem;
         }
 
-        a { color: var(--accent); }
+        #simklSelfService .simkl-toast { margin-top: 0.9rem; font-size: 0.88rem; color: var(--simkl-ok); }
 
-        .toast {
-            margin-top: 0.9rem;
-            font-size: 0.88rem;
-            color: var(--ok);
-        }
-
-        [hidden] { display: none !important; }
+        #simklSelfService [hidden] { display: none !important; }
     </style>
-</head>
-<body>
-<div class="wrap">
-    <header>
+
+    <div class="simkl-head">
         <h1>Simkl Scrobbler</h1>
-        <p class="tagline">Link your Simkl account to this Jellyfin profile.</p>
-    </header>
+        <p class="simkl-tagline">Link your Simkl account to this Jellyfin profile.</p>
+    </div>
 
-    <div id="loading" class="card muted">Loading…</div>
+    <div id="simklLoading" class="simkl-card simkl-muted">Loading…</div>
 
-    <div id="noSession" class="card" hidden>
+    <div id="simklNoSession" class="simkl-card" hidden>
         <strong>You need to be signed in to Jellyfin in this browser.</strong>
-        <p class="muted">
+        <p class="simkl-muted">
             Open Jellyfin, sign in with your usual profile, then come back to this page.
         </p>
-        <div class="actions">
-            <button class="primary" id="goToJellyfin" type="button">Open Jellyfin</button>
+        <div class="simkl-actions">
+            <button class="simkl-btn primary" id="simklGoToJellyfin" type="button">Open Jellyfin</button>
         </div>
     </div>
 
-    <div id="notLinked" class="card" hidden>
-        <span class="pill">Not linked</span>
-        <p class="muted">
+    <div id="simklNotLinked" class="simkl-card" hidden>
+        <span class="simkl-pill">Not linked</span>
+        <p class="simkl-muted">
             You'll get a short code to enter on Simkl. Your Simkl password is never
             shared with this server.
         </p>
-        <div class="actions">
-            <button class="primary" id="startLink" type="button">Link my Simkl account</button>
+        <div class="simkl-actions">
+            <button class="simkl-btn primary" id="simklStartLink" type="button">Link my Simkl account</button>
         </div>
     </div>
 
-    <div id="linking" class="card" hidden>
+    <div id="simklLinking" class="simkl-card" hidden>
         <strong>Enter this code on Simkl</strong>
-        <div class="pin" id="pin">------</div>
-        <div class="muted">
-            Go to <a id="verifyLink" href="https://simkl.com/pin" target="_blank" rel="noopener">simkl.com/pin</a>
-            and enter the code. Waiting…
-            <span id="remaining"></span>
+        <div class="simkl-pin" id="simklPin">------</div>
+        <div class="simkl-muted">
+            Go to <a id="simklVerifyLink" href="https://simkl.com/pin" target="_blank" rel="noopener">simkl.com/pin</a>
+            and enter the code. Waiting… <span id="simklRemaining"></span>
         </div>
-        <div class="actions">
-            <button id="cancelLink" type="button">Cancel</button>
+        <div class="simkl-actions">
+            <button class="simkl-btn" id="simklCancelLink" type="button">Cancel</button>
         </div>
     </div>
 
-    <div id="linked" hidden>
-        <div class="card">
-            <div class="row">
-                <div class="grow">
-                    <span class="pill on" id="accountPill">Account connected</span>
-                    <div class="muted" id="lastScrobble" style="margin-top:0.5rem;"></div>
+    <div id="simklLinked" hidden>
+        <div class="simkl-card">
+            <div class="simkl-row">
+                <div class="simkl-grow">
+                    <span class="simkl-pill on" id="simklAccountPill">Account connected</span>
+                    <div class="simkl-muted" id="simklLastScrobble" style="margin-top:0.5rem;"></div>
                 </div>
-                <button id="unlink" type="button">Unlink</button>
+                <button class="simkl-btn" id="simklUnlink" type="button">Unlink</button>
             </div>
         </div>
 
-        <div class="card">
-            <div class="opt">
+        <div class="simkl-card">
+            <div class="simkl-opt">
                 <label>
-                    <input type="checkbox" id="EnablePlaybackScrobbling"/>
+                    <input type="checkbox" id="simklEnablePlaybackScrobbling"/>
                     <span>Real-time scrobbling ("Watching now" + auto mark watched)</span>
                 </label>
-                <div class="hint">
+                <div class="simkl-hint">
                     Reports start, pause and stop as you watch, and marks things watched
                     automatically once you stop past 80%.
                 </div>
             </div>
-            <div class="opt">
-                <label><input type="checkbox" id="ScrobbleMovies"/><span>Scrobble Movies</span></label>
+            <div class="simkl-opt">
+                <label><input type="checkbox" id="simklScrobbleMovies"/><span>Scrobble Movies</span></label>
             </div>
-            <div class="opt">
-                <label><input type="checkbox" id="ScrobbleShows"/><span>Scrobble TV Shows</span></label>
+            <div class="simkl-opt">
+                <label><input type="checkbox" id="simklScrobbleShows"/><span>Scrobble TV Shows</span></label>
             </div>
-            <div class="opt">
+            <div class="simkl-opt">
                 <label>
-                    <input type="checkbox" id="SyncMarkPlayed"/>
+                    <input type="checkbox" id="simklSyncMarkPlayed"/>
                     <span>Sync manual "mark played" to Simkl</span>
                 </label>
-                <div class="hint">Ticking an episode or movie as played adds it to your Simkl history.</div>
+                <div class="simkl-hint">Ticking an episode or movie as played adds it to your Simkl history.</div>
             </div>
-            <div class="opt">
+            <div class="simkl-opt">
                 <label>
-                    <input type="checkbox" id="SyncMarkUnplayed"/>
+                    <input type="checkbox" id="simklSyncMarkUnplayed"/>
                     <span>Also remove from Simkl when unmarking</span>
                 </label>
-                <div class="hint">Off by default, to avoid accidental deletions.</div>
+                <div class="simkl-hint">Off by default, to avoid accidental deletions.</div>
             </div>
-            <div class="opt row">
-                <label for="MinLength" class="grow">Minimum runtime (minutes)</label>
-                <input type="number" id="MinLength" min="0" max="600"/>
+            <div class="simkl-opt simkl-row">
+                <label for="simklMinLength" class="simkl-grow">Minimum runtime (minutes)</label>
+                <input type="number" id="simklMinLength" min="0" max="600"/>
             </div>
-            <div class="actions">
-                <button class="primary" id="save" type="button">Save</button>
+            <div class="simkl-actions">
+                <button class="simkl-btn primary" id="simklSave" type="button">Save</button>
             </div>
-            <div class="toast" id="saved" hidden>Saved.</div>
+            <div class="simkl-toast" id="simklSaved" hidden>Saved.</div>
         </div>
     </div>
-</div>
 
-<script>
-    (function () {
-        'use strict';
+    <script>
+        (function () {
+            'use strict';
 
-        // The page is served at <base>/Simkl/Link, so everything else hangs off
-        // the same base — works whether or not Jellyfin sits under a sub-path.
-        var base = window.location.pathname.replace(/\/Simkl\/Link\/?$/i, '');
-        var token = null;
-        var pollTimer = null;
-        var countdownTimer = null;
-
-        // Jellyfin web stores its sessions in localStorage under a key we can't
-        // rely on by name, so look for the value shape instead: an object with a
-        // Servers array carrying an AccessToken.
-        function findToken() {
-            for (var i = 0; i < localStorage.length; i++) {
-                var raw;
-                try {
-                    raw = localStorage.getItem(localStorage.key(i));
-                } catch (e) {
-                    continue;
-                }
-
-                if (!raw || raw.indexOf('AccessToken') === -1) {
-                    continue;
-                }
-
-                var parsed;
-                try {
-                    parsed = JSON.parse(raw);
-                } catch (e) {
-                    continue;
-                }
-
-                var servers = parsed && parsed.Servers;
-                if (!servers || !servers.length) {
-                    continue;
-                }
-
-                var withToken = servers.filter(function (s) { return s && s.AccessToken; });
-                if (!withToken.length) {
-                    continue;
-                }
-
-                // Prefer the server this page is being served from.
-                var here = withToken.filter(function (s) {
-                    var url = (s.ManualAddress || s.LocalAddress || s.RemoteAddress || '');
-                    return url.indexOf(window.location.host) !== -1;
-                });
-                return (here[0] || withToken[0]).AccessToken;
-            }
-
-            return null;
-        }
-
-        function api(path, options) {
-            options = options || {};
-            options.headers = Object.assign({
-                'X-Emby-Token': token,
-                'Content-Type': 'application/json'
-            }, options.headers || {});
-            return fetch(base + path, options).then(function (r) {
-                if (r.status === 204) {
-                    return null;
-                }
-                if (!r.ok) {
-                    throw new Error('HTTP ' + r.status);
-                }
-                return r.json();
-            });
-        }
-
-        // Jellyfin may serialize either PascalCase or camelCase depending on
-        // version, so read both spellings.
-        function pick(obj, name) {
-            if (!obj) {
-                return undefined;
-            }
-            var lower = name.charAt(0).toLowerCase() + name.slice(1);
-            return obj[name] !== undefined ? obj[name] : obj[lower];
-        }
-
-        function show(id) {
-            ['loading', 'noSession', 'notLinked', 'linking', 'linked'].forEach(function (s) {
-                document.getElementById(s).hidden = (s !== id);
-            });
-        }
-
-        function applyOptions(options) {
-            ['EnablePlaybackScrobbling', 'ScrobbleMovies', 'ScrobbleShows',
-                'SyncMarkPlayed', 'SyncMarkUnplayed'].forEach(function (key) {
-                document.getElementById(key).checked = !!pick(options, key);
-            });
-            var min = pick(options, 'MinLength');
-            document.getElementById('MinLength').value = (min === undefined || min === null) ? 5 : min;
-        }
-
-        function render(status) {
-            if (!pick(status, 'Linked')) {
-                show('notLinked');
+            var root = document.getElementById('simklSelfService');
+            if (!root || root.dataset.simklReady === '1') {
                 return;
             }
 
-            var name = pick(status, 'SimklName');
-            var plan = pick(status, 'SimklPlan');
-            var label = 'Account connected';
-            if (name) {
-                label += ': ' + name + (plan ? ' - ' + String(plan).toUpperCase() : '');
-            }
+            root.dataset.simklReady = '1';
 
-            document.getElementById('accountPill').textContent = label;
-            var last = pick(status, 'LastScrobble');
-            document.getElementById('lastScrobble').textContent = last
-                ? 'Last scrobble: ' + last
-                : 'No scrobble recorded yet.';
-            applyOptions(pick(status, 'Options'));
-            show('linked');
-        }
+            var el = function (id) { return root.querySelector('#' + id); };
+            var token = null;
+            var base = '';
+            var pollTimer = null;
+            var countdownTimer = null;
 
-        function refresh() {
-            return api('/Simkl/Me').then(render).catch(function (err) {
-                console.error(err);
-                show('noSession');
-            });
-        }
-
-        function stopPolling() {
-            window.clearTimeout(pollTimer);
-            window.clearInterval(countdownTimer);
-            pollTimer = null;
-            countdownTimer = null;
-        }
-
-        document.getElementById('goToJellyfin').addEventListener('click', function () {
-            window.location.href = (base || '') + '/web/';
-        });
-
-        document.getElementById('startLink').addEventListener('click', function () {
-            api('/Simkl/Me/Pin', { method: 'POST' }).then(function (code) {
-                var userCode = code && (code.user_code || code.UserCode);
-                if (!userCode) {
-                    throw new Error('No PIN returned');
+            // Two contexts: injected inside the Jellyfin web client (ApiClient is
+            // there, use its session) or opened standalone from a direct link
+            // (recover the session the web client left in localStorage).
+            function resolveSession() {
+                if (typeof ApiClient !== 'undefined' && ApiClient && ApiClient.accessToken) {
+                    var t = ApiClient.accessToken();
+                    if (t) {
+                        base = ApiClient.serverAddress();
+                        return t;
+                    }
                 }
 
-                var verify = (code.verification_url || code.VerificationUrl || 'https://simkl.com/pin');
-                document.getElementById('pin').textContent = userCode;
-                var link = document.getElementById('verifyLink');
-                link.href = verify + '/' + userCode;
-                link.textContent = verify.replace(/^https?:\/\//, '');
-                show('linking');
+                base = window.location.pathname.replace(/\/Simkl\/Link(\/Fragment)?\/?$/i, '');
+                return findStoredToken();
+            }
 
-                var expires = (code.expires_in || code.ExpiresIn || 900);
-                var deadline = Date.now() + expires * 1000;
-                var interval = (code.Interval || code.interval || 5) * 1000;
+            // The key jellyfin-web stores credentials under is minified away, so
+            // match on the value's shape instead of guessing its name.
+            function findStoredToken() {
+                for (var i = 0; i < localStorage.length; i++) {
+                    var raw;
+                    try {
+                        raw = localStorage.getItem(localStorage.key(i));
+                    } catch (e) {
+                        continue;
+                    }
 
-                countdownTimer = window.setInterval(function () {
-                    var left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
-                    document.getElementById('remaining').textContent = '(' + left + 's)';
-                }, 1000);
+                    if (!raw || raw.indexOf('AccessToken') === -1) {
+                        continue;
+                    }
 
-                (function poll() {
-                    pollTimer = window.setTimeout(function () {
-                        if (Date.now() > deadline) {
-                            stopPolling();
-                            show('notLinked');
-                            return;
-                        }
+                    var parsed;
+                    try {
+                        parsed = JSON.parse(raw);
+                    } catch (e) {
+                        continue;
+                    }
 
-                        api('/Simkl/Me/Pin/' + encodeURIComponent(userCode)).then(function (res) {
-                            if (pick(res, 'Linked')) {
+                    var servers = parsed && parsed.Servers;
+                    if (!servers || !servers.length) {
+                        continue;
+                    }
+
+                    var withToken = servers.filter(function (s) { return s && s.AccessToken; });
+                    if (!withToken.length) {
+                        continue;
+                    }
+
+                    // Prefer the server this page is served from.
+                    var here = withToken.filter(function (s) {
+                        var url = (s.ManualAddress || s.LocalAddress || s.RemoteAddress || '');
+                        return url.indexOf(window.location.host) !== -1;
+                    });
+                    return (here[0] || withToken[0]).AccessToken;
+                }
+
+                return null;
+            }
+
+            function api(path, options) {
+                options = options || {};
+                options.headers = Object.assign({
+                    'X-Emby-Token': token,
+                    'Content-Type': 'application/json'
+                }, options.headers || {});
+                return fetch(base + path, options).then(function (r) {
+                    if (r.status === 204) {
+                        return null;
+                    }
+                    if (!r.ok) {
+                        throw new Error('HTTP ' + r.status);
+                    }
+                    return r.json();
+                });
+            }
+
+            // Jellyfin may serialize PascalCase or camelCase: read both.
+            function pick(obj, name) {
+                if (!obj) {
+                    return undefined;
+                }
+                var lower = name.charAt(0).toLowerCase() + name.slice(1);
+                return obj[name] !== undefined ? obj[name] : obj[lower];
+            }
+
+            function show(id) {
+                ['simklLoading', 'simklNoSession', 'simklNotLinked', 'simklLinking', 'simklLinked']
+                    .forEach(function (s) { el(s).hidden = (s !== id); });
+            }
+
+            var optionKeys = ['EnablePlaybackScrobbling', 'ScrobbleMovies', 'ScrobbleShows',
+                'SyncMarkPlayed', 'SyncMarkUnplayed'];
+
+            function applyOptions(options) {
+                optionKeys.forEach(function (key) {
+                    el('simkl' + key).checked = !!pick(options, key);
+                });
+                var min = pick(options, 'MinLength');
+                el('simklMinLength').value = (min === undefined || min === null) ? 5 : min;
+            }
+
+            function render(status) {
+                if (!pick(status, 'Linked')) {
+                    show('simklNotLinked');
+                    return;
+                }
+
+                var name = pick(status, 'SimklName');
+                var plan = pick(status, 'SimklPlan');
+                var label = 'Account connected';
+                if (name) {
+                    label += ': ' + name + (plan ? ' - ' + String(plan).toUpperCase() : '');
+                }
+
+                el('simklAccountPill').textContent = label;
+                var last = pick(status, 'LastScrobble');
+                el('simklLastScrobble').textContent = last
+                    ? 'Last scrobble: ' + last
+                    : 'No scrobble recorded yet.';
+                applyOptions(pick(status, 'Options'));
+                show('simklLinked');
+            }
+
+            function refresh() {
+                return api('/Simkl/Me').then(render).catch(function (err) {
+                    console.error(err);
+                    show('simklNoSession');
+                });
+            }
+
+            function stopPolling() {
+                window.clearTimeout(pollTimer);
+                window.clearInterval(countdownTimer);
+                pollTimer = null;
+                countdownTimer = null;
+            }
+
+            el('simklGoToJellyfin').addEventListener('click', function () {
+                window.location.href = (base || '') + '/web/';
+            });
+
+            el('simklStartLink').addEventListener('click', function () {
+                api('/Simkl/Me/Pin', { method: 'POST' }).then(function (code) {
+                    var userCode = code && (code.user_code || code.UserCode);
+                    if (!userCode) {
+                        throw new Error('No PIN returned');
+                    }
+
+                    var verify = (code.verification_url || code.VerificationUrl || 'https://simkl.com/pin');
+                    el('simklPin').textContent = userCode;
+                    var link = el('simklVerifyLink');
+                    link.href = verify + '/' + userCode;
+                    link.textContent = verify.replace(/^https?:\/\//, '');
+                    show('simklLinking');
+
+                    var expires = (code.expires_in || code.ExpiresIn || 900);
+                    var deadline = Date.now() + expires * 1000;
+                    var interval = (code.Interval || code.interval || 5) * 1000;
+
+                    countdownTimer = window.setInterval(function () {
+                        var left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+                        el('simklRemaining').textContent = '(' + left + 's)';
+                    }, 1000);
+
+                    (function poll() {
+                        pollTimer = window.setTimeout(function () {
+                            if (Date.now() > deadline) {
                                 stopPolling();
-                                refresh();
-                            } else if (pick(res, 'Pending')) {
-                                poll();
-                            } else {
-                                stopPolling();
-                                show('notLinked');
+                                show('simklNotLinked');
+                                return;
                             }
-                        }).catch(function (err) {
-                            console.error(err);
-                            poll();
-                        });
-                    }, interval);
-                })();
-            }).catch(function (err) {
-                console.error(err);
-                alert("Couldn't start the linking process, see the browser console.");
+
+                            api('/Simkl/Me/Pin/' + encodeURIComponent(userCode)).then(function (res) {
+                                if (pick(res, 'Linked')) {
+                                    stopPolling();
+                                    refresh();
+                                } else if (pick(res, 'Pending')) {
+                                    poll();
+                                } else {
+                                    stopPolling();
+                                    show('simklNotLinked');
+                                }
+                            }).catch(function (err) {
+                                console.error(err);
+                                poll();
+                            });
+                        }, interval);
+                    })();
+                }).catch(function (err) {
+                    console.error(err);
+                    show('simklNotLinked');
+                });
             });
-        });
 
-        document.getElementById('cancelLink').addEventListener('click', function () {
-            stopPolling();
-            show('notLinked');
-        });
-
-        document.getElementById('unlink').addEventListener('click', function () {
-            api('/Simkl/Me/Unlink', { method: 'POST' }).then(refresh).catch(function (err) {
-                console.error(err);
+            el('simklCancelLink').addEventListener('click', function () {
+                stopPolling();
+                show('simklNotLinked');
             });
-        });
 
-        document.getElementById('save').addEventListener('click', function () {
-            var body = {
-                EnablePlaybackScrobbling: document.getElementById('EnablePlaybackScrobbling').checked,
-                ScrobbleMovies: document.getElementById('ScrobbleMovies').checked,
-                ScrobbleShows: document.getElementById('ScrobbleShows').checked,
-                SyncMarkPlayed: document.getElementById('SyncMarkPlayed').checked,
-                SyncMarkUnplayed: document.getElementById('SyncMarkUnplayed').checked,
-                MinLength: parseInt(document.getElementById('MinLength').value, 10) || 0
-            };
-
-            var saved = document.getElementById('saved');
-            api('/Simkl/Me/Options', { method: 'POST', body: JSON.stringify(body) }).then(function () {
-                saved.hidden = false;
-                window.setTimeout(function () { saved.hidden = true; }, 2500);
-            }).catch(function (err) {
-                console.error(err);
+            el('simklUnlink').addEventListener('click', function () {
+                api('/Simkl/Me/Unlink', { method: 'POST' }).then(refresh).catch(function (err) {
+                    console.error(err);
+                });
             });
-        });
 
-        token = findToken();
-        if (!token) {
-            show('noSession');
-        } else {
-            refresh();
-        }
-    })();
-</script>
-</body>
-</html>
+            el('simklSave').addEventListener('click', function () {
+                var body = { MinLength: parseInt(el('simklMinLength').value, 10) || 0 };
+                optionKeys.forEach(function (key) {
+                    body[key] = el('simkl' + key).checked;
+                });
+
+                var saved = el('simklSaved');
+                api('/Simkl/Me/Options', { method: 'POST', body: JSON.stringify(body) }).then(function () {
+                    saved.hidden = false;
+                    window.setTimeout(function () { saved.hidden = true; }, 2500);
+                }).catch(function (err) {
+                    console.error(err);
+                });
+            });
+
+            token = resolveSession();
+            if (!token) {
+                show('simklNoSession');
+            } else {
+                refresh();
+            }
+        })();
+    </script>
+</div>

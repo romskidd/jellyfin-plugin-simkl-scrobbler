@@ -15,6 +15,7 @@ namespace Jellyfin.Plugin.Simkl
             serviceCollection.AddSingleton<SimklApi>();
             serviceCollection.AddHostedService<PlaybackScrobbler>();
             serviceCollection.AddHostedService<UserDataSync>();
+            serviceCollection.AddHostedService<PluginPagesRegistration>();
         }
     }
 }

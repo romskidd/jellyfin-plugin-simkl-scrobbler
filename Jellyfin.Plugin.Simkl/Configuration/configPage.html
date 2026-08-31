@@ -179,6 +179,11 @@
                     margin: 0 !important;
                 }
 
+                /* Detaches the sharing card from the Save / Cancel row above it. */
+                #SimklConfigurationPage .simklCardSpaced {
+                    margin-top: 2.2em;
+                }
+
                 #SimklConfigurationPage .simklLinkRow {
                     display: flex;
                     align-items: center;
@@ -337,12 +342,18 @@
                     </div>
                 </div>
 
-                <div class="simklCard">
+                <div class="simklCard simklCardSpaced">
                     <div class="simklCardTitle">Link for your users</div>
                     <p class="simklMuted" style="margin-top:0;">
                         Users without dashboard access can open this link to connect their own
                         Simkl account and set their own options. They just need to be signed in
                         to Jellyfin in the same browser.
+                    </p>
+                    <p class="simklMuted">
+                        If the optional <em>Plugin Pages</em> plugin is installed, the same page is
+                        also added to the sidebar users already see, under "Plugin Settings" — no
+                        link to share. Nothing is added when it isn't installed, and this plugin
+                        never requires it.
                     </p>
                     <div class="simklLinkRow">
                         <input id="selfServiceUrl" type="text" readonly class="simklUrlInput"/>

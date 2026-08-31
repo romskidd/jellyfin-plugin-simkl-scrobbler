@@ -58,15 +58,41 @@ namespace Jellyfin.Plugin.Simkl.API
         [AllowAnonymous]
         public ActionResult GetLinkPage()
         {
-            var stream = GetType().Assembly
-                .GetManifestResourceStream("Jellyfin.Plugin.Simkl.Configuration.linkPage.html");
-            if (stream == null)
+            var fragment = ReadFragment();
+            if (fragment == null)
             {
                 return NotFound();
             }
 
-            using var reader = new StreamReader(stream);
-            return Content(reader.ReadToEnd(), "text/html; charset=utf-8");
+            // The fragment carries its own scoped styling; this only supplies the
+            // document shell it needs when opened on its own.
+            var page = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
+                       + "<meta charset=\"utf-8\"/>\n"
+                       + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>\n"
+                       + "<title>Link your Simkl account</title>\n"
+                       + "<style>html{color-scheme:dark light}"
+                       + "body{margin:0;padding:2.2rem 1.1rem 3rem;background:#101418;color:#f2f4f6;"
+                       + "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}"
+                       + "@media(prefers-color-scheme:light){body{background:#f4f6f8;color:#16191c}}"
+                       + "a{color:#00a4dc}</style>\n</head>\n<body>\n"
+                       + fragment
+                       + "\n</body>\n</html>";
+
+            return Content(page, "text/html; charset=utf-8");
+        }
+
+        /// <summary>
+        /// Serves the same page as a bare fragment, for hosts that inject it into
+        /// an existing document (the optional Plugin Pages integration).
+        /// </summary>
+        /// <returns>The self-service HTML fragment.</returns>
+        [HttpGet("Link/Fragment")]
+        public ActionResult GetLinkFragment()
+        {
+            var fragment = ReadFragment();
+            return fragment == null
+                ? NotFound()
+                : Content(fragment, "text/html; charset=utf-8");
         }
 
         /// <summary>
@@ -220,6 +246,22 @@ namespace Jellyfin.Plugin.Simkl.API
             plugin.SaveConfiguration();
 
             return NoContent();
+        }
+
+        /// <summary>
+        /// Reads the embedded self-service markup.
+        /// </summary>
+        private static string? ReadFragment()
+        {
+            var stream = typeof(SelfServiceEndpoints).Assembly
+                .GetManifestResourceStream("Jellyfin.Plugin.Simkl.Configuration.linkPage.html");
+            if (stream == null)
+            {
+                return null;
+            }
+
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
         }
 
         /// <summary>
