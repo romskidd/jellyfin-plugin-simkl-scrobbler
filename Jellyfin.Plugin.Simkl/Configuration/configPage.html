@@ -120,6 +120,18 @@
                     SimklConfig.userSelector.append(new Option(user.Name, user.Id));
                 });
             },
+            // Point the profile selector at the given user. Ids can come with or
+            // without dashes depending on the API call, so compare normalized.
+            selectUser: function (userId) {
+                const norm = function (s) { return (s || '').replace(/-/g, '').toLowerCase(); };
+                const options = SimklConfig.userSelector.options;
+                for (let i = 0; i < options.length; i++) {
+                    if (norm(options[i].value) === norm(userId)) {
+                        SimklConfig.userSelector.selectedIndex = i;
+                        return;
+                    }
+                }
+            },
             loadConfig: async function (user, config) {
                 if (config != null) {
                     this.configCache = config;
@@ -390,6 +402,11 @@
                     await Promise.all([
                         window.ApiClient.getUsers().then(SimklConfig.populateUsers),
                         window.ApiClient.getPluginConfiguration(SimklConfig.guid).then(SimklConfig.loadConfig.bind(SimklConfig, ApiClient.getCurrentUserId()))]);
+
+                    // Keep the profile selector in sync with the profile whose
+                    // settings are displayed (the logged-in user), so Save and
+                    // Log In always target what the page is showing.
+                    SimklConfig.selectUser(ApiClient.getCurrentUserId());
                 } catch (err) {
                     console.error('Simkl config page failed to load', err);
                 } finally {
