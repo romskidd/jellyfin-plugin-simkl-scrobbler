@@ -55,6 +55,14 @@ https://raw.githubusercontent.com/romskidd/jellyfin-plugin-simkl-scrobbler/maste
   unticking removes it (off by default)
 - The settings page shows your Simkl watch statistics and the result of the
   last scrobble
+- **Self-service linking**: every user can connect their own Simkl account from
+  a page of their own, without dashboard access — share the link shown in the
+  settings page (and it also appears in the sidebar if the optional Plugin Pages
+  plugin happens to be installed)
+- Watches that Simkl doesn't confirm are queued and replayed for up to 24 hours,
+  so a network blip on the final event doesn't silently lose an episode
+- Per-user library exclusions, to keep home videos or kids' content off Simkl
+- An expired Simkl login is reported instead of failing silently
 - Easy login using pin
 - If the provider ids don't resolve, the item is matched by filename via Simkl's API
   and scrobbled anyway
@@ -63,6 +71,7 @@ https://raw.githubusercontent.com/romskidd/jellyfin-plugin-simkl-scrobbler/maste
 
 | Version | Date | Changes |
 |---|---|---|
+| **9.3.0.0** | 2026-08-31 | Self-service linking: any user can connect their own Simkl account from a standalone page, no dashboard access needed (optional Plugin Pages integration adds it to the sidebar; no dependency either way). Watches Simkl doesn't confirm are queued and replayed for up to 24h. Per-user library exclusions. An expired Simkl login is now reported instead of failing silently. The plugin also appears in the dashboard sidebar and the settings page was redesigned. |
 | **9.2.0.2** | 2026-08-31 | Fixes over 9.2.0.0: Simkl returns an empty body for URLs with a trailing slash + query parameters, which broke the settings page (infinite spinner) and the filename fallback — URLs are now normalized. Watch statistics use the correct endpoint (`POST /users/{id}/stats`) and the page shows your account type. The profile selector now opens on the logged-in user, so Save/Log In always target the profile shown. The page no longer blocks if a Simkl call fails. (9.2.0.1 was an unreleased intermediate build.) |
 | 9.2.0.0 | 2026-08-31 | **Broken — use 9.2.0.2.** Manual "mark played" (and optional unmark) now syncs to Simkl, batched per season. Settings page shows Simkl watch stats and the last scrobble result. Every API request now identifies the app (`app-name`/`app-version`), required by Simkl since April 2026. |
 | **9.1.0.0** | 2026-08-30 | New independent identity: own plugin id, name "Simkl Scrobbler", owner romskidd. No functional changes over 9.0.0.4. |
