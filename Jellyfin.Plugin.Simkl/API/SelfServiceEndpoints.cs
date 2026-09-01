@@ -197,6 +197,15 @@ namespace Jellyfin.Plugin.Simkl.API
                 return Unauthorized();
             }
 
+            // Simkl PIN codes are short alphanumerics; refuse anything else
+            // before it goes anywhere near an outgoing URL.
+            if (string.IsNullOrEmpty(userCode)
+                || userCode.Length > 16
+                || !userCode.All(char.IsLetterOrDigit))
+            {
+                return BadRequest();
+            }
+
             var status = await _simklApi.GetCodeStatus(userCode).ConfigureAwait(false);
             if (status == null)
             {

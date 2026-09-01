@@ -29,8 +29,14 @@ namespace Jellyfin.Plugin.Simkl.API
         /// <summary>
         /// Gets the oauth pin.
         /// </summary>
+        /// <remarks>
+        /// Admin only: this legacy flow hands the Simkl token back to the
+        /// browser, so it must not be reachable by regular users — they have
+        /// the <c>Simkl/Me</c> endpoints, which keep the token server-side.
+        /// </remarks>
         /// <returns>The oauth pin.</returns>
         [HttpGet("oauth/pin")]
+        [Authorize(Policy = "RequiresElevation")]
         public async Task<ActionResult<CodeResponse?>> GetPin()
         {
             return await _simklApi.GetCode();
@@ -39,9 +45,15 @@ namespace Jellyfin.Plugin.Simkl.API
         /// <summary>
         /// Gets the status for the code.
         /// </summary>
+        /// <remarks>
+        /// Admin only: once the PIN is approved this response carries the Simkl
+        /// access token, so guessing an active code must not be enough to
+        /// obtain someone else's token.
+        /// </remarks>
         /// <param name="userCode">The user auth code.</param>
         /// <returns>The code status response.</returns>
         [HttpGet("oauth/pin/{userCode}")]
+        [Authorize(Policy = "RequiresElevation")]
         public async Task<ActionResult<CodeStatusResponse?>> GetPinStatus([FromRoute] string userCode)
         {
             return await _simklApi.GetCodeStatus(userCode);
@@ -53,6 +65,7 @@ namespace Jellyfin.Plugin.Simkl.API
         /// <param name="userId">The user id.</param>
         /// <returns>The user settings.</returns>
         [HttpGet("users/settings/{userId}")]
+        [Authorize(Policy = "RequiresElevation")]
         public async Task<ActionResult<UserSettings?>> GetUserSettings([FromRoute] Guid userId)
         {
             var userConfiguration = SimklPlugin.Instance?.Configuration.GetByGuid(userId);
@@ -70,6 +83,7 @@ namespace Jellyfin.Plugin.Simkl.API
         /// <param name="userId">The user id.</param>
         /// <returns>The user's Simkl statistics.</returns>
         [HttpGet("users/stats/{userId}")]
+        [Authorize(Policy = "RequiresElevation")]
         public async Task<ActionResult> GetUserStats([FromRoute] Guid userId)
         {
             var userConfiguration = SimklPlugin.Instance?.Configuration.GetByGuid(userId);

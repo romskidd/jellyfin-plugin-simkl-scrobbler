@@ -493,8 +493,7 @@
                     config = this.configCache;
                 }
 
-                console.log("Simkl: Loading config for user " + user);
-                console.log(config);
+                console.log("Simkl: loading config for user " + user);
 
                 SimklConfig.loginButtonContainer.setAttribute('hidden', '');
                 SimklConfig.configOptionsContainer.setAttribute('hidden', '')
@@ -534,8 +533,6 @@
                     .call(document.querySelectorAll('#excludedLibraries input:checked'))
                     .map(function (input) { return input.value; });
 
-                console.log("Saving config:");
-                console.log(this.configCache);
                 ApiClient.updatePluginConfiguration(this.guid, this.configCache).then(Dashboard.processPluginConfigurationUpdateResult);
             },
             populateOptionsContainer: async function (userConfig) {
@@ -653,7 +650,20 @@
                     SimklConfig.loginSecondsRemaining.innerText = Math.round((SimklConfig.finish.getTime() - (new Date().getTime())) / 1000);
                 }, 1000);
 
-                SimklConfig.loginText.innerHTML = 'Visit <a href="' + code.verification_url + '/' + code.user_code + '" target="_blank">' + code.verification_url + '</a> on your phone or computer and enter this code:';
+                // Build the link with DOM APIs rather than innerHTML: the URL and
+                // code come from Simkl's response, so never interpolate them into
+                // markup, and only accept an https target.
+                var verifyUrl = /^https:\/\//i.test(code.verification_url || '')
+                    ? code.verification_url
+                    : 'https://simkl.com/pin';
+                SimklConfig.loginText.textContent = 'Visit ';
+                var loginLink = document.createElement('a');
+                loginLink.href = verifyUrl + '/' + encodeURIComponent(code.user_code);
+                loginLink.target = '_blank';
+                loginLink.rel = 'noopener';
+                loginLink.textContent = verifyUrl;
+                SimklConfig.loginText.appendChild(loginLink);
+                SimklConfig.loginText.appendChild(document.createTextNode(' on your phone or computer and enter this code:'));
 
                 SimklConfig.loginPin.innerText = code.user_code;
 
@@ -662,8 +672,6 @@
             },
             checkLoginProcess: async function (code) {
                 const response = await SimklAPI.checkCode(code.user_code);
-                console.log("Response:");
-                console.log(response);
 
                 if (new Date() > this.finish) {
                     Dashboard.alert("Timed out!");
@@ -689,7 +697,6 @@
                         });
                     }
 
-                    console.log(this.configCache);
 
                     await ApiClient.updatePluginConfiguration(this.guid, this.configCache);
                     await this.loadConfig(uguid);
@@ -718,7 +725,6 @@
                 var filter = this.configCache.UserConfigs.filter(function (c) {
                     return c.Id === uguid;
                 });
-                console.log(filter);
 
                 if (filter.length > 0) {
                     filter[0].UserToken = "";
@@ -726,7 +732,6 @@
                     console.log("User not found " + uguid);
                 }
 
-                console.log(this.configCache);
                 window.ApiClient.updatePluginConfiguration(this.guid, this.configCache);
                 this.loadConfig(uguid);
             }

@@ -494,10 +494,14 @@
                     }
 
                     var verify = (code.verification_url || code.VerificationUrl || 'https://simkl.com/pin');
+                    if (!/^https:\/\//i.test(verify)) {
+                        verify = 'https://simkl.com/pin';
+                    }
+
                     el('simklPin').textContent = userCode;
                     var link = el('simklVerifyLink');
-                    link.href = verify + '/' + userCode;
-                    link.textContent = verify.replace(/^https?:\/\//, '');
+                    link.href = verify + '/' + encodeURIComponent(userCode);
+                    link.textContent = verify.replace(/^https:\/\//, '');
                     show('simklLinking');
 
                     var expires = (code.expires_in || code.ExpiresIn || 900);

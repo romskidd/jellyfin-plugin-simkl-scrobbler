@@ -107,7 +107,9 @@ namespace Jellyfin.Plugin.Simkl.API
         /// <returns>Code status.</returns>
         public async Task<CodeStatusResponse?> GetCodeStatus(string userCode)
         {
-            var uri = $"/oauth/pin/{userCode}";
+            // The code comes from a route parameter: escape it so it can only
+            // ever be a path segment, never redirect the request elsewhere.
+            var uri = $"/oauth/pin/{Uri.EscapeDataString(userCode)}";
             return await Get<CodeStatusResponse>(uri);
         }
 
@@ -706,9 +708,9 @@ namespace Jellyfin.Plugin.Simkl.API
             }
             catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                _logger.LogError(e, "Invalid user token {UserToken}, deleting", userToken);
+                _logger.LogError(e, "Invalid user token, deleting");
                 SimklPlugin.Instance?.Configuration.DeleteUserToken(userToken);
-                throw new InvalidTokenException("Invalid user token " + userToken);
+                throw new InvalidTokenException("Invalid user token");
             }
         }
 

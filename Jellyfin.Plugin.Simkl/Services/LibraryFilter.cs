@@ -77,8 +77,18 @@ namespace Jellyfin.Plugin.Simkl.Services
 
                 foreach (var location in library.Locations)
                 {
-                    if (!string.IsNullOrEmpty(location)
-                        && path.StartsWith(location, StringComparison.OrdinalIgnoreCase))
+                    if (string.IsNullOrEmpty(location))
+                    {
+                        continue;
+                    }
+
+                    // Match on a directory boundary, so an excluded "/media/TV"
+                    // doesn't also capture "/media/TV2".
+                    var prefix = location.TrimEnd('/', '\\');
+                    if (path.Equals(prefix, StringComparison.OrdinalIgnoreCase)
+                        || (path.Length > prefix.Length
+                            && path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                            && (path[prefix.Length] == '/' || path[prefix.Length] == '\\')))
                     {
                         return true;
                     }
