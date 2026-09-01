@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.Tracing;
 using System.Globalization;
@@ -257,8 +257,13 @@ namespace Jellyfin.Plugin.Simkl.API
         /// <returns><c>true</c> or <c>false</c>, or null when Simkl couldn't answer.</returns>
         public async Task<bool?> IsWatchedAsync(SimklWatchedQuery query, string userToken)
         {
+            // For an episode the title-level answer is useless: it is true for
+            // every episode of a show the user is watching. Only the per-episode
+            // breakdown, which "extended=episodes" adds, tells the truth.
+            var isEpisode = query.Season != null && query.Episode != null;
+
             using var options = GetOptions(userToken);
-            options.RequestUri = BuildUri("/sync/watched");
+            options.RequestUri = BuildUri(isEpisode ? "/sync/watched?extended=episodes" : "/sync/watched");
             options.Method = HttpMethod.Post;
             options.Content = new StringContent(
                 JsonSerializer.Serialize(new[] { query }, _jsonSerializerOptions),
@@ -286,36 +291,76 @@ namespace Jellyfin.Plugin.Simkl.API
 
                 var first = document.RootElement[0];
 
-                // "result" is true/false, or the string "not_found" when Simkl
-                // couldn't resolve the ids at all — which is not an answer.
-                if (first.TryGetProperty("result", out var result))
+                // "result" is the string "not_found" when Simkl couldn't resolve
+                // the ids at all, which is not an answer either way.
+                if (first.TryGetProperty("result", out var result)
+                    && result.ValueKind == JsonValueKind.String)
                 {
-                    if (result.ValueKind == JsonValueKind.True)
-                    {
-                        return true;
-                    }
-
-                    if (result.ValueKind == JsonValueKind.String)
-                    {
-                        return null;
-                    }
+                    return null;
                 }
 
-                // For a title-level lookup, only "completed" counts as watched:
-                // "watching" or "plantowatch" is not a finished viewing.
-                if (first.TryGetProperty("list", out var list)
-                    && list.ValueKind == JsonValueKind.String)
-                {
-                    return string.Equals(list.GetString(), "completed", StringComparison.OrdinalIgnoreCase);
-                }
-
-                return result.ValueKind == JsonValueKind.False ? false : null;
+                return isEpisode
+                    ? ReadEpisodeWatched(first, query.Season!.Value, query.Episode!.Value)
+                    : ReadTitleWatched(first);
             }
             catch (JsonException ex)
             {
                 _logger.LogDebug(ex, "Could not read the watched lookup response");
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Reads the watched flag of one episode out of the season breakdown.
+        /// </summary>
+        private static bool? ReadEpisodeWatched(JsonElement item, int season, int episode)
+        {
+            if (!item.TryGetProperty("seasons", out var seasons)
+                || seasons.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+
+            foreach (var seasonElement in seasons.EnumerateArray())
+            {
+                if (!seasonElement.TryGetProperty("number", out var seasonNumber)
+                    || seasonNumber.ValueKind != JsonValueKind.Number
+                    || seasonNumber.GetInt32() != season
+                    || !seasonElement.TryGetProperty("episodes", out var episodes)
+                    || episodes.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                foreach (var episodeElement in episodes.EnumerateArray())
+                {
+                    if (episodeElement.TryGetProperty("number", out var episodeNumber)
+                        && episodeNumber.ValueKind == JsonValueKind.Number
+                        && episodeNumber.GetInt32() == episode
+                        && episodeElement.TryGetProperty("watched", out var watched))
+                    {
+                        return watched.ValueKind == JsonValueKind.True;
+                    }
+                }
+            }
+
+            // The episode isn't in the breakdown at all: no answer rather than
+            // a guess, so the caller treats it as a first watch.
+            return null;
+        }
+
+        /// <summary>
+        /// Reads whether a movie has been finished. Only "completed" counts: an
+        /// item merely sitting on the watchlist has not been watched.
+        /// </summary>
+        private static bool? ReadTitleWatched(JsonElement item)
+        {
+            if (item.TryGetProperty("list", out var list) && list.ValueKind == JsonValueKind.String)
+            {
+                return string.Equals(list.GetString(), "completed", StringComparison.OrdinalIgnoreCase);
+            }
+
+            return null;
         }
 
         /// <summary>
