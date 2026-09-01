@@ -32,7 +32,7 @@ maintained by [romskidd](https://github.com/romskidd)) with its own plugin id:
   repo. Your Simkl login and settings are kept (the configuration file is
   unchanged).
 
-## Repo for Jellyfin
+## Repo for Jellyfin & Installation
 Dashboard → Plugins → Repositories → add:
 
 ```
