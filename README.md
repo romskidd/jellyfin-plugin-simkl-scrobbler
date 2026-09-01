@@ -35,11 +35,10 @@ maintained by [romskidd](https://github.com/romskidd)) with its own plugin id:
 ## Repo for Jellyfin
 Dashboard → Plugins → Repositories → add:
 
-Then add "Simkl Scrobbler" from your addon list and restart jellyfin.
-
 ```
 https://raw.githubusercontent.com/romskidd/jellyfin-plugin-simkl-scrobbler/master/manifest.json
 ```
+Then add "Simkl Scrobbler" from your addon list and restart jellyfin. You will find options for Simkl Scrobbler in your extensions list on the left panel in the dashboard.
 
 ###
 
