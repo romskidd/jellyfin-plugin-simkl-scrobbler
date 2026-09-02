@@ -688,7 +688,13 @@
                 this.finish.setSeconds(this.finish.getSeconds() + code.expires_in);
                 this.nextInterval = new Date();
 
-                this.loginTimer = window.setTimeout(this.checkLoginProcess.bind(this, code), code.Interval * 1000);
+                // Simkl says how often the code may be polled (normally 5 s).
+                // Jellyfin serialises the field in camelCase, so read both
+                // spellings and never go below 5 s: polling faster than that
+                // was flagged as a burst in Simkl's request log.
+                this.pollDelay = Math.max(5, Number(code.interval || code.Interval) || 5) * 1000;
+                window.clearTimeout(this.loginTimer);
+                this.loginTimer = window.setTimeout(this.checkLoginProcess.bind(this, code), this.pollDelay);
                 this.remainingTimer = window.setInterval(function () {
                     SimklConfig.loginSecondsRemaining.innerText = Math.round((SimklConfig.finish.getTime() - (new Date().getTime())) / 1000);
                 }, 1000);
@@ -714,13 +720,23 @@
                 SimklConfig.loggingIn.removeAttribute('hidden');
             },
             checkLoginProcess: async function (code) {
+                if (!this.onLoginProcess) {
+                    return;
+                }
+
                 const response = await SimklAPI.checkCode(code.user_code);
+
+                if (!this.onLoginProcess) {
+                    // Cancelled while the request was in flight.
+                    return;
+                }
 
                 if (new Date() > this.finish) {
                     Dashboard.alert("Timed out!");
                     await this.stopLoginProcess();
                 } else if (response.result === "KO") {
-                    this.loginTimer = window.setTimeout(this.checkLoginProcess.bind(this, code), code.Interval * 1000);
+                    window.clearTimeout(this.loginTimer);
+                    this.loginTimer = window.setTimeout(this.checkLoginProcess.bind(this, code), this.pollDelay);
                 } else if (response.result === "OK") {
                     await this.stopLoginProcess();
 
