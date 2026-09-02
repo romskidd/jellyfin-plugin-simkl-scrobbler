@@ -414,9 +414,13 @@ namespace Jellyfin.Plugin.Simkl.API
                 {
                     foreach (var status in statuses.EnumerateArray())
                     {
-                        if (status.TryGetProperty("rewatch_id", out var id)
-                            && id.TryGetInt32(out var value))
+                        // Simkl nests the id under "response"; the flat form is
+                        // kept for safety in case the shape ever changes.
+                        if (TryReadRewatchId(status, out var value)
+                            || (status.TryGetProperty("response", out var inner)
+                                && TryReadRewatchId(inner, out value)))
                         {
+                            _logger.LogInformation("Simkl rewatch session {Session} is active", value);
                             return value;
                         }
                     }
@@ -432,6 +436,15 @@ namespace Jellyfin.Plugin.Simkl.API
                 "Rewatch write accepted without a rewatch session; Simkl answered: {Body}",
                 body.Length > 400 ? body.Substring(0, 400) + "..." : body);
             return null;
+        }
+
+        private static bool TryReadRewatchId(JsonElement element, out int value)
+        {
+            value = 0;
+            return element.ValueKind == JsonValueKind.Object
+                   && element.TryGetProperty("rewatch_id", out var id)
+                   && id.ValueKind == JsonValueKind.Number
+                   && id.TryGetInt32(out value);
         }
 
         /// <summary>
