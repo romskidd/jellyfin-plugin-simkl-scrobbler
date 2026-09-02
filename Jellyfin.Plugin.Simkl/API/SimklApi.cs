@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.Tracing;
 using System.Globalization;
@@ -9,6 +10,7 @@ using System.Net.Http.Json;
 using System.Net.Mime;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
 using Jellyfin.Extensions.Json;
@@ -30,6 +32,7 @@ namespace Jellyfin.Plugin.Simkl.API
         /* INTERFACES */
         private readonly ILogger<SimklApi> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly ConcurrentDictionary<string, PostGate> _postGates = new ConcurrentDictionary<string, PostGate>(StringComparer.Ordinal);
         private readonly JsonSerializerOptions _jsonSerializerOptions;
         private readonly JsonSerializerOptions _caseInsensitiveJsonSerializerOptions;
 
@@ -43,17 +46,12 @@ namespace Jellyfin.Plugin.Simkl.API
         /// <summary>
         /// Redirect uri.
         /// </summary>
-        public const string RedirectUri = @"https://simkl.com/apps/jellyfin/connected/";
+        public const string RedirectUri = @"https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler";
 
         /// <summary>
         /// Api key.
         /// </summary>
-        public const string Apikey = @"c721b22482097722a84a20ccc579cf9d232be85b9befe7b7805484d0ddbc6781";
-
-        /// <summary>
-        /// Secret.
-        /// </summary>
-        public const string Secret = @"87893fc73cdbd2e51a7c63975c6f941ac1c6155c0e20ffa76b83202dd10a507e";
+        public const string Apikey = @"f07edb607a8d4f3a19ecbffaefa33192f3e753c684c153595ae458bd580ab70c";
 
         /// <summary>
         /// App identifier sent with every request, as required by the Simkl API
@@ -73,6 +71,13 @@ namespace Jellyfin.Plugin.Simkl.API
         /// </summary>
         private static readonly string _identityQuery =
             "client_id=" + Apikey + "&app-name=" + AppName + "&app-version=" + _appVersion;
+
+        /// <summary>
+        /// Simkl allows one authenticated POST per second per user. Two writes
+        /// back to back (a lookup then a scrobble, a stop then a rewatch) would
+        /// trip a temporary block on the token, so writes are spaced out.
+        /// </summary>
+        private static readonly TimeSpan _minPostInterval = TimeSpan.FromSeconds(1.1);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SimklApi"/> class.
@@ -270,8 +275,7 @@ namespace Jellyfin.Plugin.Simkl.API
                 Encoding.UTF8,
                 MediaTypeNames.Application.Json);
 
-            var response = await _httpClientFactory.CreateClient(NamedClient.Default)
-                .SendAsync(options).ConfigureAwait(false);
+            var response = await SendThrottledAsync(options, userToken).ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -377,7 +381,7 @@ namespace Jellyfin.Plugin.Simkl.API
         /// <param name="history">The watch to record.</param>
         /// <param name="userToken">User token.</param>
         /// <returns>The rewatch session id, when Simkl reported one.</returns>
-        public async Task<int?> AddRewatchAsync(SimklHistory history, string userToken)
+        public async Task<RewatchSession?> AddRewatchAsync(SimklHistory history, string userToken)
         {
             using var options = GetOptions(userToken);
             options.RequestUri = BuildUri("/sync/history?allow_rewatch=yes");
@@ -387,8 +391,7 @@ namespace Jellyfin.Plugin.Simkl.API
                 Encoding.UTF8,
                 MediaTypeNames.Application.Json);
 
-            var response = await _httpClientFactory.CreateClient(NamedClient.Default)
-                .SendAsync(options).ConfigureAwait(false);
+            var response = await SendThrottledAsync(options, userToken).ConfigureAwait(false);
 
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
@@ -416,12 +419,22 @@ namespace Jellyfin.Plugin.Simkl.API
                     {
                         // Simkl nests the id under "response"; the flat form is
                         // kept for safety in case the shape ever changes.
-                        if (TryReadRewatchId(status, out var value)
-                            || (status.TryGetProperty("response", out var inner)
-                                && TryReadRewatchId(inner, out value)))
+                        var holder = status;
+                        if (!TryReadRewatchId(holder, out var value)
+                            && status.TryGetProperty("response", out var inner))
                         {
-                            _logger.LogInformation("Simkl rewatch session {Session} is active", value);
-                            return value;
+                            holder = inner;
+                            TryReadRewatchId(holder, out value);
+                        }
+
+                        if (value != 0)
+                        {
+                            var state = holder.TryGetProperty("rewatch_status", out var st)
+                                        && st.ValueKind == JsonValueKind.String
+                                ? st.GetString()
+                                : null;
+                            _logger.LogInformation("Simkl rewatch session {Session} is {State}", value, state ?? "open");
+                            return new RewatchSession(value, state);
                         }
                     }
                 }
@@ -490,8 +503,7 @@ namespace Jellyfin.Plugin.Simkl.API
             using var options = GetOptions(userToken);
             options.RequestUri = BuildUri("/users/" + accountId.Value.ToString(CultureInfo.InvariantCulture) + "/stats");
             options.Method = HttpMethod.Post;
-            var response = await _httpClientFactory.CreateClient(NamedClient.Default)
-                .SendAsync(options).ConfigureAwait(false);
+            var response = await SendThrottledAsync(options, userToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogDebug("GET /users/stats returned {Status}", response.StatusCode);
@@ -572,8 +584,7 @@ namespace Jellyfin.Plugin.Simkl.API
 
             _logger.LogDebug("POST {Endpoint} {@Body}", endpoint, body);
 
-            var response = await _httpClientFactory.CreateClient(NamedClient.Default)
-                .SendAsync(options).ConfigureAwait(false);
+            var response = await SendThrottledAsync(options, userToken).ConfigureAwait(false);
 
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
@@ -788,8 +799,7 @@ namespace Jellyfin.Plugin.Simkl.API
             using var options = GetOptions(userToken);
             options.RequestUri = BuildUri(url);
             options.Method = HttpMethod.Get;
-            var responseMessage = await _httpClientFactory.CreateClient(NamedClient.Default)
-                .SendAsync(options);
+            var responseMessage = await SendThrottledAsync(options, userToken);
             return await responseMessage.Content.ReadFromJsonAsync<T>(_jsonSerializerOptions);
         }
 
@@ -814,10 +824,69 @@ namespace Jellyfin.Plugin.Simkl.API
                     MediaTypeNames.Application.Json);
             }
 
-            var responseMessage = await _httpClientFactory.CreateClient(NamedClient.Default)
-                .SendAsync(options);
+            var responseMessage = await SendThrottledAsync(options, userToken);
 
             return await responseMessage.Content.ReadFromJsonAsync<T1>(_caseInsensitiveJsonSerializerOptions);
+        }
+
+        /// <summary>
+        /// Sends a request, spacing authenticated POSTs so one user never sends
+        /// more than one write per second, as Simkl's rate limits require.
+        /// Reads and unauthenticated calls go straight through.
+        /// </summary>
+        private async Task<HttpResponseMessage> SendThrottledAsync(HttpRequestMessage request, string? userToken)
+        {
+            var client = _httpClientFactory.CreateClient(NamedClient.Default);
+            if (request.Method != HttpMethod.Post || string.IsNullOrEmpty(userToken))
+            {
+                return await client.SendAsync(request).ConfigureAwait(false);
+            }
+
+            var gate = _postGates.GetOrAdd(userToken, _ => new PostGate());
+            await gate.Lock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                var wait = _minPostInterval - (DateTime.UtcNow - gate.LastPostUtc);
+                if (wait > TimeSpan.Zero)
+                {
+                    await Task.Delay(wait).ConfigureAwait(false);
+                }
+
+                try
+                {
+                    return await client.SendAsync(request).ConfigureAwait(false);
+                }
+                finally
+                {
+                    gate.LastPostUtc = DateTime.UtcNow;
+                }
+            }
+            finally
+            {
+                gate.Lock.Release();
+            }
+        }
+
+        /// <summary>
+        /// Per-user write pacing: one write at a time, at least a second apart.
+        /// </summary>
+        private sealed class PostGate : IDisposable
+        {
+            /// <summary>
+            /// Gets the lock serialising this user's writes.
+            /// </summary>
+            public SemaphoreSlim Lock { get; } = new SemaphoreSlim(1, 1);
+
+            /// <summary>
+            /// Gets or sets when this user's last write was sent.
+            /// </summary>
+            public DateTime LastPostUtc { get; set; } = DateTime.MinValue;
+
+            /// <inheritdoc />
+            public void Dispose()
+            {
+                Lock.Dispose();
+            }
         }
     }
 }

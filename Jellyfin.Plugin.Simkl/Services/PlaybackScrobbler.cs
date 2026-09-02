@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
@@ -43,6 +44,11 @@ namespace Jellyfin.Plugin.Simkl.Services
         // Skip re-sending the same action for the same item within this window
         // to stay clear of the server's 20-second per-user lock.
         private static readonly TimeSpan _minActionInterval = TimeSpan.FromSeconds(20);
+
+        /// <summary>
+        /// How long the Simkl plan (free / pro / vip) is trusted before asking again.
+        /// </summary>
+        private static readonly TimeSpan _accountTypeTtl = TimeSpan.FromDays(7);
 
         private readonly ISessionManager _sessionManager;
         private readonly ILogger<PlaybackScrobbler> _logger;
@@ -393,12 +399,12 @@ namespace Jellyfin.Plugin.Simkl.Services
                         // Claimed before the call so a second stop event can't
                         // file the same viewing twice.
                         finished.RewatchRecorded = true;
-                        await RecordRewatch(mediaInfo, userId, userConfig.UserToken, seriesIds)
+                        await RecordRewatch(mediaInfo, userId, userConfig, seriesIds)
                             .ConfigureAwait(false);
                     }
                 }
 
-                RecordLastScrobble(userConfig, action, mediaInfo, progress, success);
+                RecordLastScrobble(userConfig, action, mediaInfo, progress, success, seriesIds);
                 return success;
             }
             catch (InvalidTokenException)
@@ -504,13 +510,24 @@ namespace Jellyfin.Plugin.Simkl.Services
         private async Task RecordRewatch(
             MediaBrowser.Model.Dto.BaseItemDto item,
             Guid userId,
-            string userToken,
+            UserConfig userConfig,
             Dictionary<string, string>? seriesProviderIds)
         {
             var isMovie = item.IsMovie == true || item.Type == BaseItemKind.Movie;
             var ids = isMovie ? item.ProviderIds : seriesProviderIds ?? item.ProviderIds;
             if (ids == null || ids.Count == 0)
             {
+                return;
+            }
+
+            // Simkl ignores rewatch writes from free accounts but still counts
+            // them against the rate limit, and asks apps not to send them.
+            if (!await IsPaidAccount(userConfig).ConfigureAwait(false))
+            {
+                _logger.LogInformation(
+                    "Not filing a rewatch of {Name}: Simkl only tracks rewatches on Pro/VIP accounts (this one is {Plan})",
+                    item.Name,
+                    userConfig.AccountType);
                 return;
             }
 
@@ -553,14 +570,29 @@ namespace Jellyfin.Plugin.Simkl.Services
 
             try
             {
-                var rewatchId = await _simklApi.AddRewatchAsync(history, userToken).ConfigureAwait(false);
-                if (rewatchId != null)
+                var session = await _simklApi.AddRewatchAsync(history, userConfig.UserToken).ConfigureAwait(false);
+                if (session != null)
                 {
-                    _rewatchTracker.Set(userId, itemKey, rewatchId.Value);
-                    _logger.LogInformation(
-                        "Recorded a rewatch of {Name} (Simkl session {Session})",
-                        item.Name,
-                        rewatchId.Value);
+                    if (session.IsCompleted)
+                    {
+                        // A finished session takes no more episodes: forget it so
+                        // the next viewing of this title opens a fresh one.
+                        _rewatchTracker.Remove(userId, itemKey);
+                        _logger.LogInformation(
+                            "Recorded a rewatch of {Name}; Simkl session {Session} is now complete",
+                            item.Name,
+                            session.Id);
+                    }
+                    else
+                    {
+                        _rewatchTracker.Set(userId, itemKey, session.Id);
+                        _logger.LogInformation(
+                            "Recorded a rewatch of {Name} (Simkl session {Session})",
+                            item.Name,
+                            session.Id);
+                    }
+
+                    RecordLastRewatch(userConfig, item, session);
                 }
                 else
                 {
@@ -627,20 +659,131 @@ namespace Jellyfin.Plugin.Simkl.Services
         /// Records a short summary of the last scrobble attempt in the user's
         /// configuration, shown on the plugin configuration page.
         /// </summary>
-        private static void RecordLastScrobble(UserConfig userConfig, SimklScrobbleAction action, MediaBrowser.Model.Dto.BaseItemDto item, double progress, bool success)
+        private static void RecordLastScrobble(
+            UserConfig userConfig,
+            SimklScrobbleAction action,
+            MediaBrowser.Model.Dto.BaseItemDto item,
+            double progress,
+            bool success,
+            Dictionary<string, string>? seriesProviderIds)
         {
-            var displayName = string.IsNullOrEmpty(item.SeriesName)
-                ? item.Name
-                : item.SeriesName + " - " + item.Name;
             userConfig.LastScrobble = string.Format(
                 CultureInfo.InvariantCulture,
                 "{0} {1} - {2} ({3:0.#}%) at {4:yyyy-MM-dd HH:mm} UTC",
                 success ? "OK:" : "FAILED:",
                 action,
-                displayName,
+                DisplayName(item),
                 progress,
                 DateTime.UtcNow);
+            userConfig.LastScrobbleUrl = BuildSimklLink(item, seriesProviderIds);
             SimklPlugin.Instance?.SaveConfiguration();
+        }
+
+        /// <summary>
+        /// Records the last rewatch Simkl accepted, shown on the configuration pages.
+        /// </summary>
+        private static void RecordLastRewatch(UserConfig userConfig, MediaBrowser.Model.Dto.BaseItemDto item, RewatchSession session)
+        {
+            userConfig.LastRewatch = string.Format(
+                CultureInfo.InvariantCulture,
+                "{0} (Simkl session {1}, {2}) at {3:yyyy-MM-dd HH:mm} UTC",
+                DisplayName(item),
+                session.Id,
+                session.IsCompleted ? "complete" : "in progress",
+                DateTime.UtcNow);
+            SimklPlugin.Instance?.SaveConfiguration();
+        }
+
+        private static string DisplayName(MediaBrowser.Model.Dto.BaseItemDto item)
+        {
+            return string.IsNullOrEmpty(item.SeriesName)
+                ? item.Name
+                : item.SeriesName + " - " + item.Name;
+        }
+
+        /// <summary>
+        /// Builds a link to the item on Simkl through Simkl's redirect endpoint,
+        /// which resolves IMDb/TMDb/TVDB ids to the right page. Ids only: no
+        /// token or client id travels in the URL.
+        /// </summary>
+        private static string? BuildSimklLink(MediaBrowser.Model.Dto.BaseItemDto item, Dictionary<string, string>? seriesProviderIds)
+        {
+            var isMovie = item.IsMovie == true || item.Type == BaseItemKind.Movie;
+            var ids = isMovie ? item.ProviderIds : seriesProviderIds ?? item.ProviderIds;
+            if (ids == null || ids.Count == 0)
+            {
+                return null;
+            }
+
+            var url = new StringBuilder("https://api.simkl.com/redirect?to=Simkl&type=")
+                .Append(isMovie ? "movie" : "show");
+            var any = false;
+            foreach (var key in new[] { "imdb", "tmdb", "tvdb" })
+            {
+                foreach (var pair in ids)
+                {
+                    if (string.Equals(pair.Key, key, StringComparison.OrdinalIgnoreCase)
+                        && !string.IsNullOrWhiteSpace(pair.Value))
+                    {
+                        url.Append('&').Append(key).Append('=').Append(Uri.EscapeDataString(pair.Value));
+                        any = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!any)
+            {
+                return null;
+            }
+
+            if (!isMovie)
+            {
+                if (item.ParentIndexNumber != null)
+                {
+                    url.Append("&season=").Append(item.ParentIndexNumber.Value.ToString(CultureInfo.InvariantCulture));
+                }
+
+                if (item.IndexNumber != null)
+                {
+                    url.Append("&episode=").Append(item.IndexNumber.Value.ToString(CultureInfo.InvariantCulture));
+                }
+            }
+
+            return url.ToString();
+        }
+
+        /// <summary>
+        /// Tells whether the user's Simkl plan supports rewatches, asking Simkl
+        /// at most once a week. An unknown plan is let through: Simkl then
+        /// decides, which beats dropping a legitimate rewatch on a hiccup.
+        /// </summary>
+        private async Task<bool> IsPaidAccount(UserConfig userConfig)
+        {
+            var stale = userConfig.AccountTypeCheckedUtc == null
+                        || DateTime.UtcNow - userConfig.AccountTypeCheckedUtc.Value > _accountTypeTtl;
+            if (string.IsNullOrEmpty(userConfig.AccountType) || stale)
+            {
+                try
+                {
+                    var settings = await _simklApi.GetUserSettings(userConfig.UserToken).ConfigureAwait(false);
+                    var plan = settings?.Account?.Type;
+                    if (!string.IsNullOrEmpty(plan))
+                    {
+                        userConfig.AccountType = plan;
+                        userConfig.AccountTypeCheckedUtc = DateTime.UtcNow;
+                        SimklPlugin.Instance?.SaveConfiguration();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Could not read the Simkl plan for the rewatch check");
+                }
+            }
+
+            return string.IsNullOrEmpty(userConfig.AccountType)
+                   || string.Equals(userConfig.AccountType, "pro", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(userConfig.AccountType, "vip", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

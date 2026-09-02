@@ -478,6 +478,32 @@
                     Dashboard.alert('Copy the selected link with Ctrl+C');
                 }
             },
+            renderLastActivity: function (userConfig) {
+                const box = document.querySelector('#lastScrobble');
+                box.textContent = '';
+                const line = document.createElement('div');
+                line.textContent = userConfig.LastScrobble
+                    ? 'Last scrobble: ' + userConfig.LastScrobble
+                    : 'No scrobble recorded yet on this server.';
+                const url = userConfig.LastScrobbleUrl;
+                if (userConfig.LastScrobble && typeof url === 'string'
+                    && url.indexOf('https://api.simkl.com/redirect?') === 0) {
+                    line.appendChild(document.createTextNode(' \u00b7 '));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.textContent = 'Open on Simkl';
+                    line.appendChild(link);
+                }
+                box.appendChild(line);
+                if (userConfig.LastRewatch) {
+                    const rewatch = document.createElement('div');
+                    rewatch.textContent = 'Last rewatch: ' + userConfig.LastRewatch;
+                    box.appendChild(rewatch);
+                }
+            },
+
             setConnectionPill: function (text, connected) {
                 if (!SimklConfig.connectionPill) {
                     return;
@@ -553,10 +579,7 @@
                         true);
                 }
 
-                const lastScrobbleEl = document.querySelector('#lastScrobble');
-                lastScrobbleEl.innerText = userConfig.LastScrobble
-                    ? 'Last scrobble: ' + userConfig.LastScrobble
-                    : 'No scrobble recorded yet on this server.';
+                SimklConfig.renderLastActivity(userConfig);
 
                 SimklAPI.getUserStats(userConfig.Id).then(function (stats) {
                     SimklConfig.renderStats(stats);

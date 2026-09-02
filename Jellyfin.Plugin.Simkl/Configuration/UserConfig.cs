@@ -93,6 +93,28 @@ namespace Jellyfin.Plugin.Simkl.Configuration
         public string? LastScrobble { get; set; }
 
         /// <summary>
+        /// Gets or sets a link to the last scrobbled item on Simkl, built on
+        /// Simkl's redirect endpoint. Carries ids only, never credentials.
+        /// </summary>
+        public string? LastScrobbleUrl { get; set; }
+
+        /// <summary>
+        /// Gets or sets a short summary of the last rewatch recorded on Simkl.
+        /// </summary>
+        public string? LastRewatch { get; set; }
+
+        /// <summary>
+        /// Gets or sets the Simkl plan ("free", "pro" or "vip") as last reported
+        /// by Simkl. Rewatch writes are only sent for paid plans, as Simkl asks.
+        /// </summary>
+        public string? AccountType { get; set; }
+
+        /// <summary>
+        /// Gets or sets when <see cref="AccountType"/> was last refreshed.
+        /// </summary>
+        public DateTime? AccountTypeCheckedUtc { get; set; }
+
+        /// <summary>
         /// Gets or sets a value indicating whether finishing something already
         /// watched is recorded as a Simkl rewatch session. Simkl only honours
         /// this for Pro and VIP accounts.

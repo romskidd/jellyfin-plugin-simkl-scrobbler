@@ -133,6 +133,8 @@ namespace Jellyfin.Plugin.Simkl.API
                 SimklName = simklName,
                 SimklPlan = simklPlan,
                 LastScrobble = config?.LastScrobble,
+                LastScrobbleUrl = config?.LastScrobbleUrl,
+                LastRewatch = config?.LastRewatch,
                 Options = new SimklUserOptions
                 {
                     EnablePlaybackScrobbling = config?.EnablePlaybackScrobbling ?? true,

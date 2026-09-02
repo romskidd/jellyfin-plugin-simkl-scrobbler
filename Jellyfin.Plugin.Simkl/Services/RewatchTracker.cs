@@ -66,6 +66,23 @@ namespace Jellyfin.Plugin.Simkl.Services
             }
         }
 
+        /// <summary>
+        /// Forgets a session, so the next viewing of the title opens a new one.
+        /// </summary>
+        /// <param name="userId">The Jellyfin user.</param>
+        /// <param name="itemKey">Series id for episodes, item id for movies.</param>
+        public void Remove(Guid userId, string itemKey)
+        {
+            lock (_lock)
+            {
+                Load();
+                if (_sessions!.Remove(BuildKey(userId, itemKey)))
+                {
+                    Save();
+                }
+            }
+        }
+
         private static string BuildKey(Guid userId, string itemKey)
         {
             return userId.ToString("N") + "|" + itemKey;

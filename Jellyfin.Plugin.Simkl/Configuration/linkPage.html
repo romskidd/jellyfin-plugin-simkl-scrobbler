@@ -459,9 +459,28 @@
                 var paid = plan && ['PRO', 'VIP'].indexOf(String(plan).toUpperCase()) !== -1;
                 el('simklRewatchOption').hidden = !paid;
                 var last = pick(status, 'LastScrobble');
-                el('simklLastScrobble').textContent = last
-                    ? 'Last scrobble: ' + last
-                    : 'No scrobble recorded yet.';
+                var lastBox = el('simklLastScrobble');
+                lastBox.textContent = '';
+                var lastLine = document.createElement('div');
+                lastLine.textContent = last ? 'Last scrobble: ' + last : 'No scrobble recorded yet.';
+                var lastUrl = pick(status, 'LastScrobbleUrl');
+                if (last && typeof lastUrl === 'string'
+                    && lastUrl.indexOf('https://api.simkl.com/redirect?') === 0) {
+                    lastLine.appendChild(document.createTextNode(' \u00b7 '));
+                    var lastLink = document.createElement('a');
+                    lastLink.href = lastUrl;
+                    lastLink.target = '_blank';
+                    lastLink.rel = 'noopener noreferrer';
+                    lastLink.textContent = 'Open on Simkl';
+                    lastLine.appendChild(lastLink);
+                }
+                lastBox.appendChild(lastLine);
+                var lastRewatch = pick(status, 'LastRewatch');
+                if (lastRewatch) {
+                    var rewatchLine = document.createElement('div');
+                    rewatchLine.textContent = 'Last rewatch: ' + lastRewatch;
+                    lastBox.appendChild(rewatchLine);
+                }
                 var options = pick(status, 'Options');
                 applyOptions(options);
                 renderLibraries(pick(options, 'ExcludedLibraries'));
