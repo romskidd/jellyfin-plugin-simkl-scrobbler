@@ -294,6 +294,10 @@
                                     class="raised simklLogout"><span>Log Out</span></button>
                         </div>
                         <div id="accountStats" class="simklStats"></div>
+                        <div id="statsFooter" class="simklMuted" hidden style="margin-top:0.5rem;">
+                            Statistics are refreshed at most once a day.
+                            <a href="#" id="refreshStats" onclick="SimklConfig.refreshStats(); return false;">Refresh now</a>
+                        </div>
                     </div>
 
                     <div class="simklCard">
@@ -601,7 +605,8 @@
 
                 SimklConfig.renderLastActivity(userConfig);
 
-                SimklAPI.getUserStats(userConfig.Id).then(function (stats) {
+                SimklConfig.statsUserId = userConfig.Id;
+                SimklAPI.getUserStats(userConfig.Id, false).then(function (stats) {
                     SimklConfig.renderStats(stats);
                 }).catch(function (err) {
                     console.log("Couldn't render Simkl stats", err);
@@ -645,9 +650,24 @@
                     console.log("Couldn't list libraries", err);
                 });
             },
+            refreshStats: function () {
+                if (!SimklConfig.statsUserId) {
+                    return;
+                }
+                const link = document.querySelector('#refreshStats');
+                link.textContent = 'Refreshing...';
+                SimklAPI.getUserStats(SimklConfig.statsUserId, true).then(function (stats) {
+                    SimklConfig.renderStats(stats);
+                }).catch(function (err) {
+                    console.log("Couldn't refresh Simkl stats", err);
+                }).then(function () {
+                    link.textContent = 'Refresh now';
+                });
+            },
             renderStats: function (stats) {
                 const el = document.querySelector('#accountStats');
                 el.innerHTML = '';
+                document.querySelector('#statsFooter').hidden = !stats;
                 if (!stats) {
                     return;
                 }
@@ -852,9 +872,9 @@
                         return null;
                     });
             },
-            getUserStats: function (secret) {
+            getUserStats: function (secret, refresh) {
                 const request = {
-                    url: window.ApiClient.getUrl('Simkl/users/stats/' + secret),
+                    url: window.ApiClient.getUrl('Simkl/users/stats/' + secret + (refresh ? '?refresh=true' : '')),
                     type: 'GET',
                     headers: {
                         accept: 'application/json'

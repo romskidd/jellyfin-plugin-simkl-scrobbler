@@ -33,6 +33,7 @@ namespace Jellyfin.Plugin.Simkl.API
         private readonly ILogger<SimklApi> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ConcurrentDictionary<string, PostGate> _postGates = new ConcurrentDictionary<string, PostGate>(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<string, CachedStats> _statsCache = new ConcurrentDictionary<string, CachedStats>(StringComparer.Ordinal);
         private readonly JsonSerializerOptions _jsonSerializerOptions;
         private readonly JsonSerializerOptions _caseInsensitiveJsonSerializerOptions;
 
@@ -78,6 +79,13 @@ namespace Jellyfin.Plugin.Simkl.API
         /// trip a temporary block on the token, so writes are spaced out.
         /// </summary>
         private static readonly TimeSpan _minPostInterval = TimeSpan.FromSeconds(1.1);
+
+        /// <summary>
+        /// How long the watch statistics are reused before asking Simkl again.
+        /// The stats call opens the user's whole history on Simkl's side, so it
+        /// is only worth one request a day for four decorative tiles.
+        /// </summary>
+        private static readonly TimeSpan _statsTtl = TimeSpan.FromHours(24);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SimklApi"/> class.
@@ -501,15 +509,27 @@ namespace Jellyfin.Plugin.Simkl.API
         /// shape. The Simkl account id is resolved through the settings call.
         /// </summary>
         /// <param name="userToken">User token.</param>
+        /// <param name="refresh">True to bypass the daily cache, on the user's explicit request.</param>
         /// <returns>The raw JSON response, or null when the request failed.</returns>
-        public async Task<string?> GetUserStatsRaw(string userToken)
+        public async Task<string?> GetUserStatsRaw(string userToken, bool refresh = false)
         {
-            var settings = await GetUserSettings(userToken).ConfigureAwait(false);
-            var accountId = settings?.Account?.Id;
+            _statsCache.TryGetValue(userToken, out var cached);
+            if (!refresh && cached != null && DateTime.UtcNow - cached.FetchedUtc < _statsTtl)
+            {
+                return cached.Raw;
+            }
+
+            // The account id never changes: reuse it instead of paying a settings call.
+            var accountId = cached?.AccountId;
             if (accountId == null)
             {
-                _logger.LogDebug("No Simkl account id available, can't fetch stats");
-                return null;
+                var settings = await GetUserSettings(userToken).ConfigureAwait(false);
+                accountId = settings?.Account?.Id;
+                if (accountId == null)
+                {
+                    _logger.LogDebug("No Simkl account id available, can't fetch stats");
+                    return null;
+                }
             }
 
             using var options = GetOptions(userToken);
@@ -518,11 +538,13 @@ namespace Jellyfin.Plugin.Simkl.API
             var response = await SendThrottledAsync(options, userToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogDebug("GET /users/stats returned {Status}", response.StatusCode);
-                return null;
+                _logger.LogDebug("POST /users/{{id}}/stats returned {Status}", response.StatusCode);
+                return cached?.Raw;
             }
 
-            return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            var raw = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            _statsCache[userToken] = new CachedStats(raw, accountId.Value, DateTime.UtcNow);
+            return raw;
         }
 
         /// <summary>
@@ -899,6 +921,25 @@ namespace Jellyfin.Plugin.Simkl.API
             {
                 Lock.Dispose();
             }
+        }
+
+        /// <summary>
+        /// A day's worth of watch statistics for one user.
+        /// </summary>
+        private sealed class CachedStats
+        {
+            public CachedStats(string raw, int accountId, DateTime fetchedUtc)
+            {
+                Raw = raw;
+                AccountId = accountId;
+                FetchedUtc = fetchedUtc;
+            }
+
+            public string Raw { get; }
+
+            public int AccountId { get; }
+
+            public DateTime FetchedUtc { get; }
         }
     }
 }
