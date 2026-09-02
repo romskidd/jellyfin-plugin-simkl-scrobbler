@@ -34,6 +34,8 @@ namespace Jellyfin.Plugin.Simkl.API
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ConcurrentDictionary<string, PostGate> _postGates = new ConcurrentDictionary<string, PostGate>(StringComparer.Ordinal);
         private readonly ConcurrentDictionary<string, CachedStats> _statsCache = new ConcurrentDictionary<string, CachedStats>(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<string, CachedSettings> _settingsCache = new ConcurrentDictionary<string, CachedSettings>(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<string, ActivitySnapshot> _activityCache = new ConcurrentDictionary<string, ActivitySnapshot>(StringComparer.Ordinal);
         private readonly JsonSerializerOptions _jsonSerializerOptions;
         private readonly JsonSerializerOptions _caseInsensitiveJsonSerializerOptions;
 
@@ -58,7 +60,7 @@ namespace Jellyfin.Plugin.Simkl.API
         /// App identifier sent with every request, as required by the Simkl API
         /// (see api.simkl.org/conventions/headers).
         /// </summary>
-        private const string AppName = "simkl-scrobbler";
+        private const string AppName = "Simkl Scrobbler";
 
         /// <summary>
         /// Plugin version reported to Simkl alongside <see cref="AppName"/>.
@@ -71,7 +73,7 @@ namespace Jellyfin.Plugin.Simkl.API
         /// Simkl requires client_id, app-name and app-version as URL parameters.
         /// </summary>
         private static readonly string _identityQuery =
-            "client_id=" + Apikey + "&app-name=" + AppName + "&app-version=" + _appVersion;
+            "client_id=" + Apikey + "&app-name=" + Uri.EscapeDataString(AppName) + "&app-version=" + _appVersion;
 
         /// <summary>
         /// Simkl allows one authenticated POST per second per user. Two writes
@@ -81,11 +83,11 @@ namespace Jellyfin.Plugin.Simkl.API
         private static readonly TimeSpan _minPostInterval = TimeSpan.FromSeconds(1.1);
 
         /// <summary>
-        /// How long the watch statistics are reused before asking Simkl again.
-        /// The stats call opens the user's whole history on Simkl's side, so it
-        /// is only worth one request a day for four decorative tiles.
+        /// How long one reading of <c>GET /sync/activities</c> is reused. It
+        /// absorbs the bursts of a page load, where settings and statistics are
+        /// needed within seconds, so a page load costs one activity call at most.
         /// </summary>
-        private static readonly TimeSpan _statsTtl = TimeSpan.FromHours(24);
+        private static readonly TimeSpan _activityMemo = TimeSpan.FromMinutes(5);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SimklApi"/> class.
@@ -133,24 +135,58 @@ namespace Jellyfin.Plugin.Simkl.API
         /// <returns>User settings.</returns>
         public async Task<UserSettings?> GetUserSettings(string userToken)
         {
+            // Simkl asks apps to read /users/settings only when the activity
+            // endpoint says the settings changed. The snapshot lives in memory
+            // and in the user's configuration, so a restart doesn't cost a read.
+            _settingsCache.TryGetValue(userToken, out var cached);
+            if (cached == null)
+            {
+                cached = LoadStoredSettings(userToken);
+                if (cached != null)
+                {
+                    _settingsCache[userToken] = cached;
+                }
+            }
+
+            var activity = await GetActivityAsync(userToken).ConfigureAwait(false);
+            if (activity.Unauthorized)
+            {
+                // A token Simkl no longer accepts (revoked, or issued to another
+                // application) is dropped at once, so the pages show "link
+                // expired" instead of a connected account that can't scrobble.
+                DropToken(userToken);
+                return new UserSettings { Error = "user_token_failed" };
+            }
+
+            if (cached != null
+                && (activity.SettingsStamp == null
+                    || string.Equals(activity.SettingsStamp, cached.Stamp, StringComparison.Ordinal)))
+            {
+                // Unchanged, or the activity call failed transiently: the snapshot stays good.
+                return cached.Settings;
+            }
+
             try
             {
                 var settings = await Post<UserSettings, object>("/users/settings/", userToken);
-
-                // Simkl answers 401 with a JSON body, so the failure arrives here
-                // as data. A token it no longer accepts (revoked, or issued to the
-                // previous plugin identity) is dropped at once, so the pages show
-                // "link expired" instead of a connected account that can't scrobble.
                 if (string.Equals(settings?.Error, "user_token_failed", StringComparison.Ordinal))
                 {
-                    SimklPlugin.Instance?.Configuration.DeleteUserToken(userToken);
+                    DropToken(userToken);
+                    return settings;
+                }
+
+                if (settings != null && settings.Account?.Id != null)
+                {
+                    var entry = new CachedSettings(settings, activity.SettingsStamp);
+                    _settingsCache[userToken] = entry;
+                    StoreSettings(userToken, entry);
                 }
 
                 return settings;
             }
             catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                SimklPlugin.Instance?.Configuration.DeleteUserToken(userToken);
+                DropToken(userToken);
                 // Wontfix: Custom status codes
                 // "You don't get to pick your response code" - Luke (System Architect of Emby)
                 // https://emby.media/community/index.php?/topic/61889-wiki-issue-resultfactorythrowerror/
@@ -509,27 +545,36 @@ namespace Jellyfin.Plugin.Simkl.API
         /// shape. The Simkl account id is resolved through the settings call.
         /// </summary>
         /// <param name="userToken">User token.</param>
-        /// <param name="refresh">True to bypass the daily cache, on the user's explicit request.</param>
         /// <returns>The raw JSON response, or null when the request failed.</returns>
-        public async Task<string?> GetUserStatsRaw(string userToken, bool refresh = false)
+        /// <remarks>
+        /// The stats call opens the user's whole history on Simkl's side, so the
+        /// result is kept until the activity endpoint reports that anything
+        /// changed for the user. The stats only appear on the settings page.
+        /// </remarks>
+        public async Task<string?> GetUserStatsRaw(string userToken)
         {
             _statsCache.TryGetValue(userToken, out var cached);
-            if (!refresh && cached != null && DateTime.UtcNow - cached.FetchedUtc < _statsTtl)
+            var activity = await GetActivityAsync(userToken).ConfigureAwait(false);
+            if (activity.Unauthorized)
+            {
+                DropToken(userToken);
+                return null;
+            }
+
+            if (cached != null
+                && (activity.AllStamp == null
+                    || string.Equals(activity.AllStamp, cached.Stamp, StringComparison.Ordinal)))
             {
                 return cached.Raw;
             }
 
-            // The account id never changes: reuse it instead of paying a settings call.
-            var accountId = cached?.AccountId;
+            // Settings are activity-gated too, so this is normally free.
+            var settings = await GetUserSettings(userToken).ConfigureAwait(false);
+            var accountId = settings?.Account?.Id;
             if (accountId == null)
             {
-                var settings = await GetUserSettings(userToken).ConfigureAwait(false);
-                accountId = settings?.Account?.Id;
-                if (accountId == null)
-                {
-                    _logger.LogDebug("No Simkl account id available, can't fetch stats");
-                    return null;
-                }
+                _logger.LogDebug("No Simkl account id available, can't fetch stats");
+                return cached?.Raw;
             }
 
             using var options = GetOptions(userToken);
@@ -543,7 +588,7 @@ namespace Jellyfin.Plugin.Simkl.API
             }
 
             var raw = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-            _statsCache[userToken] = new CachedStats(raw, accountId.Value, DateTime.UtcNow);
+            _statsCache[userToken] = new CachedStats(raw, activity.AllStamp);
             return raw;
         }
 
@@ -752,7 +797,7 @@ namespace Jellyfin.Plugin.Simkl.API
         {
             var requestMessage = new HttpRequestMessage();
             requestMessage.Headers.TryAddWithoutValidation("simkl-api-key", Apikey);
-            requestMessage.Headers.UserAgent.Add(new ProductInfoHeaderValue("SimklScrobbler", _appVersion));
+            requestMessage.Headers.UserAgent.Add(new ProductInfoHeaderValue("SimklScrobbler-Jellyfin", _appVersion));
             if (!string.IsNullOrEmpty(userToken))
             {
                 requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", userToken);
@@ -902,6 +947,180 @@ namespace Jellyfin.Plugin.Simkl.API
         }
 
         /// <summary>
+        /// Reads <c>GET /sync/activities</c>, the cheap way to know whether the
+        /// user's settings or history changed. One reading is reused for a few
+        /// minutes so a page load costs a single call.
+        /// </summary>
+        private async Task<ActivitySnapshot> GetActivityAsync(string userToken)
+        {
+            if (_activityCache.TryGetValue(userToken, out var memo)
+                && DateTime.UtcNow - memo.CheckedUtc < _activityMemo)
+            {
+                return memo;
+            }
+
+            var snapshot = new ActivitySnapshot { CheckedUtc = DateTime.UtcNow };
+            try
+            {
+                using var options = GetOptions(userToken);
+                options.RequestUri = BuildUri("/sync/activities");
+                options.Method = HttpMethod.Get;
+                var response = await SendThrottledAsync(options, userToken).ConfigureAwait(false);
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    snapshot.Unauthorized = true;
+                    return snapshot;
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogDebug("GET /sync/activities returned {Status}", response.StatusCode);
+                    return snapshot;
+                }
+
+                var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                using var document = JsonDocument.Parse(body);
+                var rootElement = document.RootElement;
+                if (rootElement.ValueKind == JsonValueKind.Object)
+                {
+                    if (rootElement.TryGetProperty("all", out var all) && all.ValueKind == JsonValueKind.String)
+                    {
+                        snapshot.AllStamp = all.GetString();
+                    }
+
+                    if (rootElement.TryGetProperty("settings", out var settings)
+                        && settings.ValueKind == JsonValueKind.Object
+                        && settings.TryGetProperty("all", out var settingsAll)
+                        && settingsAll.ValueKind == JsonValueKind.String)
+                    {
+                        snapshot.SettingsStamp = settingsAll.GetString();
+                    }
+                    else
+                    {
+                        // No settings activity yet (fresh account): key on the global stamp.
+                        snapshot.SettingsStamp = snapshot.AllStamp == null ? null : "all:" + snapshot.AllStamp;
+                    }
+                }
+
+                _activityCache[userToken] = snapshot;
+                return snapshot;
+            }
+            catch (Exception ex) when (ex is HttpRequestException || ex is JsonException || ex is TaskCanceledException)
+            {
+                _logger.LogDebug(ex, "Could not read the Simkl activity");
+                return snapshot;
+            }
+        }
+
+        private void DropToken(string userToken)
+        {
+            SimklPlugin.Instance?.Configuration.DeleteUserToken(userToken);
+            _settingsCache.TryRemove(userToken, out _);
+            _statsCache.TryRemove(userToken, out _);
+            _activityCache.TryRemove(userToken, out _);
+        }
+
+        private static CachedSettings? LoadStoredSettings(string userToken)
+        {
+            var configs = SimklPlugin.Instance?.Configuration.UserConfigs;
+            if (configs == null)
+            {
+                return null;
+            }
+
+            foreach (var config in configs)
+            {
+                if (string.Equals(config.UserToken, userToken, StringComparison.Ordinal)
+                    && config.SimklAccountId != null
+                    && !string.IsNullOrEmpty(config.SettingsStamp))
+                {
+                    var settings = new UserSettings
+                    {
+                        User = new User { Name = config.SimklUserName },
+                        Account = new SimklAccount { Id = config.SimklAccountId, Type = config.AccountType }
+                    };
+                    return new CachedSettings(settings, config.SettingsStamp);
+                }
+            }
+
+            return null;
+        }
+
+        private static void StoreSettings(string userToken, CachedSettings entry)
+        {
+            var configs = SimklPlugin.Instance?.Configuration.UserConfigs;
+            if (configs == null)
+            {
+                return;
+            }
+
+            var changed = false;
+            foreach (var config in configs)
+            {
+                if (string.Equals(config.UserToken, userToken, StringComparison.Ordinal))
+                {
+                    config.SimklUserName = entry.Settings.User?.Name;
+                    config.SimklAccountId = entry.Settings.Account?.Id;
+                    config.AccountType = entry.Settings.Account?.Type;
+                    config.AccountTypeCheckedUtc = DateTime.UtcNow;
+                    config.SettingsStamp = entry.Stamp;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                SimklPlugin.Instance?.SaveConfiguration();
+            }
+        }
+
+        /// <summary>
+        /// One reading of the activity endpoint.
+        /// </summary>
+        private sealed class ActivitySnapshot
+        {
+            public bool Unauthorized { get; set; }
+
+            public string? AllStamp { get; set; }
+
+            public string? SettingsStamp { get; set; }
+
+            public DateTime CheckedUtc { get; set; }
+        }
+
+        /// <summary>
+        /// A user's settings snapshot and the activity stamp it was read under.
+        /// </summary>
+        private sealed class CachedSettings
+        {
+            public CachedSettings(UserSettings settings, string? stamp)
+            {
+                Settings = settings;
+                Stamp = stamp;
+            }
+
+            public UserSettings Settings { get; }
+
+            public string? Stamp { get; }
+        }
+
+        /// <summary>
+        /// The watch statistics and the activity stamp they were read under.
+        /// </summary>
+        private sealed class CachedStats
+        {
+            public CachedStats(string raw, string? stamp)
+            {
+                Raw = raw;
+                Stamp = stamp;
+            }
+
+            public string Raw { get; }
+
+            public string? Stamp { get; }
+        }
+
+        /// <summary>
         /// Per-user write pacing: one write at a time, at least a second apart.
         /// </summary>
         private sealed class PostGate : IDisposable
@@ -921,25 +1140,6 @@ namespace Jellyfin.Plugin.Simkl.API
             {
                 Lock.Dispose();
             }
-        }
-
-        /// <summary>
-        /// A day's worth of watch statistics for one user.
-        /// </summary>
-        private sealed class CachedStats
-        {
-            public CachedStats(string raw, int accountId, DateTime fetchedUtc)
-            {
-                Raw = raw;
-                AccountId = accountId;
-                FetchedUtc = fetchedUtc;
-            }
-
-            public string Raw { get; }
-
-            public int AccountId { get; }
-
-            public DateTime FetchedUtc { get; }
         }
     }
 }

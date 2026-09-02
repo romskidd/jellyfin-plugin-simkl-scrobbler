@@ -115,6 +115,23 @@ namespace Jellyfin.Plugin.Simkl.Configuration
         public DateTime? AccountTypeCheckedUtc { get; set; }
 
         /// <summary>
+        /// Gets or sets the Simkl display name, as last reported by Simkl.
+        /// </summary>
+        public string? SimklUserName { get; set; }
+
+        /// <summary>
+        /// Gets or sets the Simkl account id, as last reported by Simkl.
+        /// </summary>
+        public int? SimklAccountId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the <c>settings.all</c> timestamp from Simkl's activity
+        /// endpoint at the time the settings above were read. Simkl only needs
+        /// to be asked for the settings again when this value changes.
+        /// </summary>
+        public string? SettingsStamp { get; set; }
+
+        /// <summary>
         /// Gets or sets a value indicating whether finishing something already
         /// watched is recorded as a Simkl rewatch session. Simkl only honours
         /// this for Pro and VIP accounts.

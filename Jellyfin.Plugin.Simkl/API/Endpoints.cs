@@ -81,11 +81,10 @@ namespace Jellyfin.Plugin.Simkl.API
         /// Gets the Simkl watch statistics for the user, passed through as raw JSON.
         /// </summary>
         /// <param name="userId">The user id.</param>
-        /// <param name="refresh">True to bypass the daily cache and ask Simkl again.</param>
         /// <returns>The user's Simkl statistics.</returns>
         [HttpGet("users/stats/{userId}")]
         [Authorize(Policy = "RequiresElevation")]
-        public async Task<ActionResult> GetUserStats([FromRoute] Guid userId, [FromQuery] bool refresh = false)
+        public async Task<ActionResult> GetUserStats([FromRoute] Guid userId)
         {
             var userConfiguration = SimklPlugin.Instance?.Configuration.GetByGuid(userId);
             if (userConfiguration == null || string.IsNullOrEmpty(userConfiguration.UserToken))
@@ -93,7 +92,7 @@ namespace Jellyfin.Plugin.Simkl.API
                 return NotFound();
             }
 
-            var raw = await _simklApi.GetUserStatsRaw(userConfiguration.UserToken, refresh);
+            var raw = await _simklApi.GetUserStatsRaw(userConfiguration.UserToken);
             if (raw == null)
             {
                 return NotFound();
