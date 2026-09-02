@@ -23,6 +23,7 @@ namespace Jellyfin.Plugin.Simkl
             serviceCollection.AddHostedService<PlaybackScrobbler>();
             serviceCollection.AddHostedService<UserDataSync>();
             serviceCollection.AddHostedService<PluginPagesRegistration>();
+            serviceCollection.AddHostedService<LinkValidation>();
         }
     }
 }

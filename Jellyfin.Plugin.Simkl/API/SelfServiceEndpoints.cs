@@ -122,8 +122,18 @@ namespace Jellyfin.Plugin.Simkl.API
             if (linked)
             {
                 var settings = await _simklApi.GetUserSettings(config!.UserToken).ConfigureAwait(false);
-                simklName = settings?.User?.Name;
-                simklPlan = settings?.Account?.Type;
+                if (string.Equals(settings?.Error, "user_token_failed", StringComparison.Ordinal))
+                {
+                    // The token was just dropped: re-read the config so the page
+                    // shows "link expired" right away.
+                    linked = false;
+                    config = SimklPlugin.Instance?.Configuration.GetByGuid(userId.Value);
+                }
+                else
+                {
+                    simklName = settings?.User?.Name;
+                    simklPlan = settings?.Account?.Type;
+                }
             }
 
             return Ok(new

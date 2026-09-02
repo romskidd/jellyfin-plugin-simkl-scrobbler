@@ -46,7 +46,7 @@ namespace Jellyfin.Plugin.Simkl.API
         /// <summary>
         /// Redirect uri.
         /// </summary>
-        public const string RedirectUri = @"https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler";
+        public const string RedirectUri = @"https://romskidd.github.io/jellyfin-plugin-simkl-scrobbler/connected.html";
 
         /// <summary>
         /// Api key.
@@ -101,7 +101,7 @@ namespace Jellyfin.Plugin.Simkl.API
         /// <returns>Code response.</returns>
         public async Task<CodeResponse?> GetCode()
         {
-            var uri = $"/oauth/pin?redirect={RedirectUri}";
+            var uri = "/oauth/pin?redirect=" + Uri.EscapeDataString(RedirectUri);
             return await Get<CodeResponse>(uri);
         }
 
@@ -127,10 +127,22 @@ namespace Jellyfin.Plugin.Simkl.API
         {
             try
             {
-                return await Post<UserSettings, object>("/users/settings/", userToken);
+                var settings = await Post<UserSettings, object>("/users/settings/", userToken);
+
+                // Simkl answers 401 with a JSON body, so the failure arrives here
+                // as data. A token it no longer accepts (revoked, or issued to the
+                // previous plugin identity) is dropped at once, so the pages show
+                // "link expired" instead of a connected account that can't scrobble.
+                if (string.Equals(settings?.Error, "user_token_failed", StringComparison.Ordinal))
+                {
+                    SimklPlugin.Instance?.Configuration.DeleteUserToken(userToken);
+                }
+
+                return settings;
             }
             catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
+                SimklPlugin.Instance?.Configuration.DeleteUserToken(userToken);
                 // Wontfix: Custom status codes
                 // "You don't get to pick your response code" - Luke (System Architect of Emby)
                 // https://emby.media/community/index.php?/topic/61889-wiki-issue-resultfactorythrowerror/

@@ -567,6 +567,14 @@
                 const profile = SimklConfig.profileName(userConfig.Id);
                 try {
                     const settings = await SimklAPI.getUserSettings(userConfig.Id);
+                    if (settings && settings.error === 'user_token_failed') {
+                        // Simkl rejected the stored token and the server dropped it:
+                        // reload and show the "link expired" state instead of a
+                        // connected account that can't scrobble.
+                        const fresh = await ApiClient.getPluginConfiguration(SimklConfig.guid);
+                        await SimklConfig.loadConfig(userConfig.Id, fresh);
+                        return;
+                    }
                     const name = (settings && settings.user && settings.user.name) ? settings.user.name : 'Simkl user';
                     const plan = (settings && settings.account && settings.account.type) ? settings.account.type.toUpperCase() : null;
                     SimklConfig.setConnectionPill(
