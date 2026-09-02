@@ -14,7 +14,6 @@ namespace Jellyfin.Plugin.Simkl
         {
             serviceCollection.AddSingleton<SimklApi>();
             serviceCollection.AddSingleton<LibraryFilter>();
-            serviceCollection.AddSingleton<RewatchTracker>();
 
             // The retry queue is both a hosted service and a dependency of the
             // scrobbler, so it is registered once and resolved for both roles.

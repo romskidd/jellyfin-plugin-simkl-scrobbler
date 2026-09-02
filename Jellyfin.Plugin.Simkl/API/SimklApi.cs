@@ -60,7 +60,7 @@ namespace Jellyfin.Plugin.Simkl.API
         /// App identifier sent with every request, as required by the Simkl API
         /// (see api.simkl.org/conventions/headers).
         /// </summary>
-        private const string AppName = "Simkl Scrobbler";
+        private const string AppName = "jellyfin-plugin-simkl-scrobbler";
 
         /// <summary>
         /// Plugin version reported to Simkl alongside <see cref="AppName"/>.
@@ -234,42 +234,47 @@ namespace Jellyfin.Plugin.Simkl.API
         }
 
         /// <summary>
-        /// Reports a real-time scrobble event (start / pause / stop) to Simkl.
+        /// Sends a scrobble event, falling back to a filename match when the
+        /// provider ids don't resolve on Simkl.
         /// </summary>
-        /// <remarks>
-        /// Implements the <c>/scrobble/{action}</c> lifecycle. The body is built from
-        /// the item's provider ids first; if Simkl can't resolve them (<c>404</c>) it
-        /// falls back to a filename search exactly like <see cref="MarkAsWatched"/>.
-        /// </remarks>
-        /// <param name="action">The scrobble action.</param>
-        /// <param name="item">The item being played.</param>
-        /// <param name="progress">Playback progress as a percentage (0 to 100).</param>
+        /// <param name="action">Start, pause or stop.</param>
+        /// <param name="item">The Jellyfin item.</param>
+        /// <param name="progress">Playback progress, 0 to 100.</param>
         /// <param name="userToken">User token.</param>
-        /// <param name="seriesProviderIds">Optional series-level provider ids, resolved
-        /// by the caller when the item is an episode. When present these are used for
-        /// the <c>show</c> object instead of the episode's own ids.</param>
-        /// <returns><c>true</c> if Simkl accepted the event.</returns>
-        public async Task<bool> ScrobbleAsync(SimklScrobbleAction action, BaseItemDto item, double progress, string userToken, Dictionary<string, string>? seriesProviderIds = null)
+        /// <param name="seriesProviderIds">Series-level ids for an episode.</param>
+        /// <param name="allowRewatch">
+        /// True to let Simkl file this stop as a rewatch when the item was
+        /// already watched (Pro/VIP). Simkl still tries the regular write first,
+        /// so a first watch stays a first watch.
+        /// </param>
+        /// <returns>Whether Simkl accepted the event, and the rewatch session it reported, if any.</returns>
+        public async Task<ScrobbleResult> ScrobbleAsync(
+            SimklScrobbleAction action,
+            BaseItemDto item,
+            double progress,
+            string userToken,
+            Dictionary<string, string>? seriesProviderIds = null,
+            bool allowRewatch = false)
         {
             var body = BuildScrobbleBody(item, progress, seriesProviderIds);
             if (body == null)
             {
                 _logger.LogDebug("Nothing to scrobble for {Name} ({Type})", item.Name, item.Type);
-                return false;
+                return new ScrobbleResult();
             }
 
-            var status = await PostScrobble(action, body, userToken).ConfigureAwait(false);
-            if (IsScrobbleSuccess(status))
+            var first = await PostScrobble(action, body, userToken, allowRewatch).ConfigureAwait(false);
+            if (IsScrobbleSuccess(first.Status))
             {
-                return true;
+                return new ScrobbleResult { Success = true, Rewatch = first.Rewatch };
             }
 
             // The 20-second per-user lock or a transient error: don't retry now,
             // the next real player event will cover it.
-            if (status != System.Net.HttpStatusCode.NotFound)
+            if (first.Status != System.Net.HttpStatusCode.NotFound)
             {
-                _logger.LogDebug("Scrobble {Action} returned {Status}, will retry on next event", action, status);
-                return false;
+                _logger.LogDebug("Scrobble {Action} returned {Status}, will retry on next event", action, first.Status);
+                return new ScrobbleResult();
             }
 
             // 404 id_err: the ids didn't resolve. Try a filename match (full path, then file name only).
@@ -285,11 +290,11 @@ namespace Jellyfin.Plugin.Simkl.API
 
             if (body == null)
             {
-                return false;
+                return new ScrobbleResult();
             }
 
-            status = await PostScrobble(action, body, userToken).ConfigureAwait(false);
-            return IsScrobbleSuccess(status);
+            var second = await PostScrobble(action, body, userToken, allowRewatch).ConfigureAwait(false);
+            return new ScrobbleResult { Success = IsScrobbleSuccess(second.Status), Rewatch = second.Rewatch };
         }
 
         /// <summary>
@@ -302,218 +307,6 @@ namespace Jellyfin.Plugin.Simkl.API
         public async Task<SyncHistoryResponse?> AddToHistory(SimklHistory history, string userToken)
         {
             return await SyncHistoryAsync(history, userToken).ConfigureAwait(false);
-        }
-
-        /// <summary>
-        /// Asks Simkl whether the user has already watched an item
-        /// (<c>POST /sync/watched</c>).
-        /// </summary>
-        /// <remarks>
-        /// Simkl is the authority here, not Jellyfin: something watched years
-        /// ago — before this server existed, or on another device — is watched
-        /// as far as Simkl is concerned even though Jellyfin has never seen it.
-        /// </remarks>
-        /// <param name="query">The item to look up.</param>
-        /// <param name="userToken">User token.</param>
-        /// <returns><c>true</c> or <c>false</c>, or null when Simkl couldn't answer.</returns>
-        public async Task<bool?> IsWatchedAsync(SimklWatchedQuery query, string userToken)
-        {
-            // For an episode the title-level answer is useless: it is true for
-            // every episode of a show the user is watching. Only the per-episode
-            // breakdown, which "extended=episodes" adds, tells the truth.
-            var isEpisode = query.Season != null && query.Episode != null;
-
-            using var options = GetOptions(userToken);
-            options.RequestUri = BuildUri(isEpisode ? "/sync/watched?extended=episodes" : "/sync/watched");
-            options.Method = HttpMethod.Post;
-            options.Content = new StringContent(
-                JsonSerializer.Serialize(new[] { query }, _jsonSerializerOptions),
-                Encoding.UTF8,
-                MediaTypeNames.Application.Json);
-
-            var response = await SendThrottledAsync(options, userToken).ConfigureAwait(false);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogDebug("Watched lookup returned {Status}", response.StatusCode);
-                return null;
-            }
-
-            var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-            try
-            {
-                using var document = JsonDocument.Parse(body);
-                if (document.RootElement.ValueKind != JsonValueKind.Array
-                    || document.RootElement.GetArrayLength() == 0)
-                {
-                    return null;
-                }
-
-                var first = document.RootElement[0];
-
-                // "result" is the string "not_found" when Simkl couldn't resolve
-                // the ids at all, which is not an answer either way.
-                if (first.TryGetProperty("result", out var result)
-                    && result.ValueKind == JsonValueKind.String)
-                {
-                    return null;
-                }
-
-                return isEpisode
-                    ? ReadEpisodeWatched(first, query.Season!.Value, query.Episode!.Value)
-                    : ReadTitleWatched(first);
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogDebug(ex, "Could not read the watched lookup response");
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Reads the watched flag of one episode out of the season breakdown.
-        /// </summary>
-        private static bool? ReadEpisodeWatched(JsonElement item, int season, int episode)
-        {
-            if (!item.TryGetProperty("seasons", out var seasons)
-                || seasons.ValueKind != JsonValueKind.Array)
-            {
-                return null;
-            }
-
-            foreach (var seasonElement in seasons.EnumerateArray())
-            {
-                if (!seasonElement.TryGetProperty("number", out var seasonNumber)
-                    || seasonNumber.ValueKind != JsonValueKind.Number
-                    || seasonNumber.GetInt32() != season
-                    || !seasonElement.TryGetProperty("episodes", out var episodes)
-                    || episodes.ValueKind != JsonValueKind.Array)
-                {
-                    continue;
-                }
-
-                foreach (var episodeElement in episodes.EnumerateArray())
-                {
-                    if (episodeElement.TryGetProperty("number", out var episodeNumber)
-                        && episodeNumber.ValueKind == JsonValueKind.Number
-                        && episodeNumber.GetInt32() == episode
-                        && episodeElement.TryGetProperty("watched", out var watched))
-                    {
-                        return watched.ValueKind == JsonValueKind.True;
-                    }
-                }
-            }
-
-            // The episode isn't in the breakdown at all: no answer rather than
-            // a guess, so the caller treats it as a first watch.
-            return null;
-        }
-
-        /// <summary>
-        /// Reads whether a movie has been finished. Only "completed" counts: an
-        /// item merely sitting on the watchlist has not been watched.
-        /// </summary>
-        private static bool? ReadTitleWatched(JsonElement item)
-        {
-            if (item.TryGetProperty("list", out var list) && list.ValueKind == JsonValueKind.String)
-            {
-                return string.Equals(list.GetString(), "completed", StringComparison.OrdinalIgnoreCase);
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Records a watch of something the user already finished, as a Simkl
-        /// rewatch session (<c>POST /sync/history?allow_rewatch=yes</c>).
-        /// </summary>
-        /// <remarks>
-        /// Simkl decides whether to open a new session or extend the running
-        /// one; the id it returns must be pinned on later writes so a series
-        /// rewatched episode by episode stays in a single session. Rewatches
-        /// are a Pro/VIP feature: for a free account the call is accepted and
-        /// silently does nothing.
-        /// </remarks>
-        /// <param name="history">The watch to record.</param>
-        /// <param name="userToken">User token.</param>
-        /// <returns>The rewatch session id, when Simkl reported one.</returns>
-        public async Task<RewatchSession?> AddRewatchAsync(SimklHistory history, string userToken)
-        {
-            using var options = GetOptions(userToken);
-            options.RequestUri = BuildUri("/sync/history?allow_rewatch=yes");
-            options.Method = HttpMethod.Post;
-            options.Content = new StringContent(
-                JsonSerializer.Serialize(history, _jsonSerializerOptions),
-                Encoding.UTF8,
-                MediaTypeNames.Application.Json);
-
-            var response = await SendThrottledAsync(options, userToken).ConfigureAwait(false);
-
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-            {
-                SimklPlugin.Instance?.Configuration.DeleteUserToken(userToken);
-                throw new InvalidTokenException("Invalid user token");
-            }
-
-            var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogWarning("Rewatch write returned {Status}", response.StatusCode);
-                return null;
-            }
-
-            // Read the id defensively: only this one field matters, and the
-            // surrounding shape is free to grow.
-            try
-            {
-                using var document = JsonDocument.Parse(body);
-                if (document.RootElement.TryGetProperty("added", out var added)
-                    && added.TryGetProperty("statuses", out var statuses)
-                    && statuses.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var status in statuses.EnumerateArray())
-                    {
-                        // Simkl nests the id under "response"; the flat form is
-                        // kept for safety in case the shape ever changes.
-                        var holder = status;
-                        if (!TryReadRewatchId(holder, out var value)
-                            && status.TryGetProperty("response", out var inner))
-                        {
-                            holder = inner;
-                            TryReadRewatchId(holder, out value);
-                        }
-
-                        if (value != 0)
-                        {
-                            var state = holder.TryGetProperty("rewatch_status", out var st)
-                                        && st.ValueKind == JsonValueKind.String
-                                ? st.GetString()
-                                : null;
-                            _logger.LogInformation("Simkl rewatch session {Session} is {State}", value, state ?? "open");
-                            return new RewatchSession(value, state);
-                        }
-                    }
-                }
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogWarning(ex, "Could not read the rewatch id from the response");
-            }
-
-            // The body carries only counters and ids, never credentials.
-            _logger.LogInformation(
-                "Rewatch write accepted without a rewatch session; Simkl answered: {Body}",
-                body.Length > 400 ? body.Substring(0, 400) + "..." : body);
-            return null;
-        }
-
-        private static bool TryReadRewatchId(JsonElement element, out int value)
-        {
-            value = 0;
-            return element.ValueKind == JsonValueKind.Object
-                   && element.TryGetProperty("rewatch_id", out var id)
-                   && id.ValueKind == JsonValueKind.Number
-                   && id.TryGetInt32(out value);
         }
 
         /// <summary>
@@ -647,12 +440,20 @@ namespace Jellyfin.Plugin.Simkl.API
             return Math.Round(Math.Clamp(progress, 0d, 100d), 2);
         }
 
-        /// <summary>
-        /// Posts a scrobble body and returns the HTTP status code.
-        /// </summary>
-        private async Task<System.Net.HttpStatusCode> PostScrobble(SimklScrobbleAction action, SimklScrobbleBody body, string userToken)
+        private async Task<(System.Net.HttpStatusCode Status, RewatchSession? Rewatch)> PostScrobble(
+            SimklScrobbleAction action,
+            SimklScrobbleBody body,
+            string userToken,
+            bool allowRewatch)
         {
             var endpoint = "/scrobble/" + action.ToString().ToLowerInvariant();
+            if (allowRewatch)
+            {
+                // Only the stop marks anything as watched, so the flag only
+                // means something there.
+                endpoint += "?allow_rewatch=yes";
+            }
+
             using var options = GetOptions(userToken);
             options.RequestUri = BuildUri(endpoint);
             options.Method = HttpMethod.Post;
@@ -672,7 +473,84 @@ namespace Jellyfin.Plugin.Simkl.API
                 throw new InvalidTokenException("Invalid user token");
             }
 
-            return response.StatusCode;
+            RewatchSession? rewatch = null;
+            if (allowRewatch && response.IsSuccessStatusCode)
+            {
+                var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                rewatch = FindRewatch(text);
+                if (rewatch == null && text.Contains("pro_required", StringComparison.Ordinal))
+                {
+                    _logger.LogInformation("Simkl did not file a rewatch: the account is not Pro/VIP (rewatch_status pro_required)");
+                }
+
+                // The rewatch flag on scrobble is new and not documented yet:
+                // keep the answer visible while the shape settles. Ids only.
+                _logger.LogInformation(
+                    "Scrobble stop with allow_rewatch answered: {Body}",
+                    text.Length > 400 ? text.Substring(0, 400) + "..." : text);
+            }
+
+            return (response.StatusCode, rewatch);
+        }
+
+        /// <summary>
+        /// Looks for a rewatch session anywhere in a Simkl response: an object
+        /// carrying a numeric <c>rewatch_id</c>, with <c>rewatch_status</c> next
+        /// to it when present.
+        /// </summary>
+        private static RewatchSession? FindRewatch(string json)
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(json);
+                return FindRewatch(document.RootElement);
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+
+        private static RewatchSession? FindRewatch(JsonElement element)
+        {
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    if (element.TryGetProperty("rewatch_id", out var id)
+                        && id.ValueKind == JsonValueKind.Number
+                        && id.TryGetInt32(out var value)
+                        && value != 0)
+                    {
+                        var status = element.TryGetProperty("rewatch_status", out var st) && st.ValueKind == JsonValueKind.String
+                            ? st.GetString()
+                            : null;
+                        return new RewatchSession(value, status);
+                    }
+
+                    foreach (var property in element.EnumerateObject())
+                    {
+                        var found = FindRewatch(property.Value);
+                        if (found != null)
+                        {
+                            return found;
+                        }
+                    }
+
+                    return null;
+                case JsonValueKind.Array:
+                    foreach (var child in element.EnumerateArray())
+                    {
+                        var found = FindRewatch(child);
+                        if (found != null)
+                        {
+                            return found;
+                        }
+                    }
+
+                    return null;
+                default:
+                    return null;
+            }
         }
 
         /// <summary>
@@ -797,7 +675,7 @@ namespace Jellyfin.Plugin.Simkl.API
         {
             var requestMessage = new HttpRequestMessage();
             requestMessage.Headers.TryAddWithoutValidation("simkl-api-key", Apikey);
-            requestMessage.Headers.UserAgent.Add(new ProductInfoHeaderValue("SimklScrobbler-Jellyfin", _appVersion));
+            requestMessage.Headers.UserAgent.Add(new ProductInfoHeaderValue("jellyfin-plugin-simkl-scrobbler", _appVersion));
             if (!string.IsNullOrEmpty(userToken))
             {
                 requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", userToken);

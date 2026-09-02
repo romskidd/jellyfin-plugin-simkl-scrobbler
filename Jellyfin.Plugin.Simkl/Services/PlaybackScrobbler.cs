@@ -45,20 +45,12 @@ namespace Jellyfin.Plugin.Simkl.Services
         // to stay clear of the server's 20-second per-user lock.
         private static readonly TimeSpan _minActionInterval = TimeSpan.FromSeconds(20);
 
-        /// <summary>
-        /// How long the Simkl plan (free / pro / vip) is trusted before asking again.
-        /// </summary>
-        private static readonly TimeSpan _accountTypeTtl = TimeSpan.FromDays(7);
-
         private readonly ISessionManager _sessionManager;
         private readonly ILogger<PlaybackScrobbler> _logger;
         private readonly SimklApi _simklApi;
         private readonly ILibraryManager _libraryManager;
         private readonly LibraryFilter _libraryFilter;
         private readonly ScrobbleRetryQueue _retryQueue;
-        private readonly RewatchTracker _rewatchTracker;
-        private readonly IUserDataManager _userDataManager;
-        private readonly IUserManager _userManager;
         private readonly ConcurrentDictionary<string, SessionState> _sessions;
 
         /// <summary>
@@ -70,19 +62,13 @@ namespace Jellyfin.Plugin.Simkl.Services
         /// <param name="libraryManager">Instance of the <see cref="ILibraryManager"/> interface.</param>
         /// <param name="libraryFilter">Instance of the <see cref="LibraryFilter"/>.</param>
         /// <param name="retryQueue">Instance of the <see cref="ScrobbleRetryQueue"/>.</param>
-        /// <param name="rewatchTracker">Instance of the <see cref="RewatchTracker"/>.</param>
-        /// <param name="userDataManager">Instance of the <see cref="IUserDataManager"/> interface.</param>
-        /// <param name="userManager">Instance of the <see cref="IUserManager"/> interface.</param>
         public PlaybackScrobbler(
             ISessionManager sessionManager,
             ILogger<PlaybackScrobbler> logger,
             SimklApi simklApi,
             ILibraryManager libraryManager,
             LibraryFilter libraryFilter,
-            ScrobbleRetryQueue retryQueue,
-            RewatchTracker rewatchTracker,
-            IUserDataManager userDataManager,
-            IUserManager userManager)
+            ScrobbleRetryQueue retryQueue)
         {
             _sessionManager = sessionManager;
             _logger = logger;
@@ -90,9 +76,6 @@ namespace Jellyfin.Plugin.Simkl.Services
             _libraryManager = libraryManager;
             _libraryFilter = libraryFilter;
             _retryQueue = retryQueue;
-            _rewatchTracker = rewatchTracker;
-            _userDataManager = userDataManager;
-            _userManager = userManager;
             _sessions = new ConcurrentDictionary<string, SessionState>();
         }
 
@@ -288,16 +271,6 @@ namespace Jellyfin.Plugin.Simkl.Services
             };
             _sessions[session.Id] = state;
 
-            // Settled before playback progresses: by the time it ends, both
-            // Jellyfin and Simkl consider the item watched and the answer would
-            // always be "yes".
-            if (skipReason == null && userConfig!.EnableRewatches)
-            {
-                state.WasAlreadyWatched = await WasAlreadyWatched(
-                        session.UserId, e.MediaInfo, userConfig.UserToken)
-                    .ConfigureAwait(false);
-            }
-
             if (skipReason != null)
             {
                 // Logged exactly once per session+item, at debug level so it never
@@ -366,9 +339,12 @@ namespace Jellyfin.Plugin.Simkl.Services
                     session.UserName);
 
                 var seriesIds = ResolveSeriesProviderIds(mediaInfo);
-                var success = await _simklApi.ScrobbleAsync(
-                        action, mediaInfo, progress, userConfig.UserToken, seriesIds)
+                var allowRewatch = await ShouldAllowRewatch(action, progress, session.Id, userConfig, mediaInfo.Name)
                     .ConfigureAwait(false);
+                var result = await _simklApi.ScrobbleAsync(
+                        action, mediaInfo, progress, userConfig.UserToken, seriesIds, allowRewatch)
+                    .ConfigureAwait(false);
+                var success = result.Success;
 
                 if (success && _sessions.TryGetValue(session.Id, out var s))
                 {
@@ -380,28 +356,14 @@ namespace Jellyfin.Plugin.Simkl.Services
                 {
                     QueueForRetry(action, mediaInfo, progress, userId, seriesIds);
                 }
-                else if (action == SimklScrobbleAction.Stop
-                         && progress >= RetryThreshold
-                         && userConfig.EnableRewatches
-                         && _sessions.TryGetValue(session.Id, out var finished)
-                         && finished.WasAlreadyWatched
-                         && !finished.RewatchRecorded)
+                else if (result.Rewatch != null)
                 {
-                    if (progress - finished.StartProgress < MinRewatchSpan)
-                    {
-                        _logger.LogInformation(
-                            "Not filing a rewatch of {Name}: only {Span:0.#}% of it played this session",
-                            mediaInfo.Name,
-                            progress - finished.StartProgress);
-                    }
-                    else
-                    {
-                        // Claimed before the call so a second stop event can't
-                        // file the same viewing twice.
-                        finished.RewatchRecorded = true;
-                        await RecordRewatch(mediaInfo, userId, userConfig, seriesIds)
-                            .ConfigureAwait(false);
-                    }
+                    RecordLastRewatch(userConfig, mediaInfo, result.Rewatch);
+                    _logger.LogInformation(
+                        "Recorded a rewatch of {Name} (Simkl session {Session}, {State})",
+                        mediaInfo.Name,
+                        result.Rewatch.Id,
+                        result.Rewatch.Status ?? "open");
                 }
 
                 RecordLastScrobble(userConfig, action, mediaInfo, progress, success, seriesIds);
@@ -422,196 +384,6 @@ namespace Jellyfin.Plugin.Simkl.Services
             }
 
             return false;
-        }
-
-        /// <summary>
-        /// Whether the user had already watched the item before this playback.
-        /// </summary>
-        /// <remarks>
-        /// Jellyfin's played flag answers for free when it is set, but it only
-        /// knows what happened on this server: something watched years ago, or
-        /// elsewhere, is watched on Simkl and unknown here. So when Jellyfin
-        /// says no, Simkl gets the final word.
-        /// </remarks>
-        private async Task<bool> WasAlreadyWatched(
-            Guid userId,
-            MediaBrowser.Model.Dto.BaseItemDto item,
-            string userToken)
-        {
-            try
-            {
-                var user = _userManager.GetUserById(userId);
-                var libraryItem = _libraryManager.GetItemById(item.Id);
-                if (user != null && libraryItem != null
-                    && _userDataManager.GetUserData(user, libraryItem)?.Played == true)
-                {
-                    _logger.LogInformation("Jellyfin already lists {Name} as played before this playback", item.Name);
-                    return true;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "Could not read the local played state");
-            }
-
-            var isMovie = item.IsMovie == true || item.Type == BaseItemKind.Movie;
-            var ids = isMovie ? item.ProviderIds : ResolveSeriesProviderIds(item) ?? item.ProviderIds;
-            if (ids == null || ids.Count == 0)
-            {
-                return false;
-            }
-
-            try
-            {
-                var query = new SimklWatchedQuery(
-                    new Dictionary<string, string>(ids, StringComparer.OrdinalIgnoreCase),
-                    isMovie ? "movie" : "show");
-                if (!isMovie)
-                {
-                    query.Season = item.ParentIndexNumber;
-                    query.Episode = item.IndexNumber;
-                }
-
-                var watched = await _simklApi.IsWatchedAsync(query, userToken).ConfigureAwait(false);
-                if (watched != null)
-                {
-                    _logger.LogInformation(
-                        "Simkl reports {Name} as {State} before this playback",
-                        item.Name,
-                        watched.Value ? "already watched" : "not watched");
-                }
-                else
-                {
-                    _logger.LogInformation(
-                        "Simkl could not tell whether {Name} was watched before; treating it as a first watch",
-                        item.Name);
-                }
-
-                return watched == true;
-            }
-            catch (Exception ex)
-            {
-                // Unknown means "treat as a first watch": recording a rewatch
-                // that never happened is worse than missing one.
-                _logger.LogDebug(ex, "Could not ask Simkl whether {Name} was watched", item.Name);
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Records a finished rewatch as its own Simkl session.
-        /// </summary>
-        /// <remarks>
-        /// The scrobble endpoints can't open rewatch sessions, so this is a
-        /// separate history write. It only runs for an item the user had
-        /// already finished — otherwise Simkl would file a first watch as a
-        /// rewatch, since the <c>stop</c> just marked it completed.
-        /// </remarks>
-        private async Task RecordRewatch(
-            MediaBrowser.Model.Dto.BaseItemDto item,
-            Guid userId,
-            UserConfig userConfig,
-            Dictionary<string, string>? seriesProviderIds)
-        {
-            var isMovie = item.IsMovie == true || item.Type == BaseItemKind.Movie;
-            var ids = isMovie ? item.ProviderIds : seriesProviderIds ?? item.ProviderIds;
-            if (ids == null || ids.Count == 0)
-            {
-                return;
-            }
-
-            // Simkl ignores rewatch writes from free accounts but still counts
-            // them against the rate limit, and asks apps not to send them.
-            if (!await IsPaidAccount(userConfig).ConfigureAwait(false))
-            {
-                _logger.LogInformation(
-                    "Not filing a rewatch of {Name}: Simkl only tracks rewatches on Pro/VIP accounts (this one is {Plan})",
-                    item.Name,
-                    userConfig.AccountType);
-                return;
-            }
-
-            // One session per title: episodes of the same show share the series key.
-            var itemKey = isMovie
-                ? item.Id.ToString("N", CultureInfo.InvariantCulture)
-                : (item.SeriesId?.ToString("N", CultureInfo.InvariantCulture) ?? item.Id.ToString("N", CultureInfo.InvariantCulture));
-            var known = _rewatchTracker.Get(userId, itemKey);
-
-            var history = new SimklHistory();
-            if (isMovie)
-            {
-                history.Movies.Add(new SimklMovie
-                {
-                    Title = item.Name,
-                    Year = item.ProductionYear,
-                    Ids = new SimklMovieIds(ids),
-                    WatchedAt = DateTime.UtcNow,
-                    RewatchId = known
-                });
-            }
-            else
-            {
-                history.Shows.Add(new SimklShow
-                {
-                    Title = item.SeriesName,
-                    Year = item.ProductionYear,
-                    Ids = new SimklShowIds(ids),
-                    RewatchId = known,
-                    Seasons = new[]
-                    {
-                        new Season
-                        {
-                            Number = item.ParentIndexNumber,
-                            Episodes = new[] { new ShowEpisode { Number = item.IndexNumber } }
-                        }
-                    }
-                });
-            }
-
-            try
-            {
-                var session = await _simklApi.AddRewatchAsync(history, userConfig.UserToken).ConfigureAwait(false);
-                if (session != null)
-                {
-                    if (session.IsCompleted)
-                    {
-                        // A finished session takes no more episodes: forget it so
-                        // the next viewing of this title opens a fresh one.
-                        _rewatchTracker.Remove(userId, itemKey);
-                        _logger.LogInformation(
-                            "Recorded a rewatch of {Name}; Simkl session {Session} is now complete",
-                            item.Name,
-                            session.Id);
-                    }
-                    else
-                    {
-                        _rewatchTracker.Set(userId, itemKey, session.Id);
-                        _logger.LogInformation(
-                            "Recorded a rewatch of {Name} (Simkl session {Session})",
-                            item.Name,
-                            session.Id);
-                    }
-
-                    RecordLastRewatch(userConfig, item, session);
-                }
-                else
-                {
-                    // A free Simkl account, or a title watched again too soon
-                    // after the previous time: Simkl accepts the write but opens
-                    // no rewatch session.
-                    _logger.LogInformation(
-                        "Simkl did not open a rewatch session for {Name} (free account, or watched again too soon)",
-                        item.Name);
-                }
-            }
-            catch (InvalidTokenException)
-            {
-                _logger.LogDebug("Deleted invalid user token");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Couldn't record the rewatch of {Name}", item.Name);
-            }
         }
 
         /// <summary>
@@ -754,36 +526,68 @@ namespace Jellyfin.Plugin.Simkl.Services
         }
 
         /// <summary>
-        /// Tells whether the user's Simkl plan supports rewatches, asking Simkl
-        /// at most once a week. An unknown plan is let through: Simkl then
-        /// decides, which beats dropping a legitimate rewatch on a hiccup.
+        /// Decides whether this stop may be filed as a rewatch by Simkl. Simkl
+        /// itself checks that the item was already watched, keeps the two-day
+        /// gap and ignores free plans; the plugin adds the user's opt-in, the
+        /// paid-plan check (so no useless flag is sent) and a "really played"
+        /// guard: at least half of the item since the session started, so that
+        /// resuming near the end or skipping ahead never counts.
+        /// </summary>
+        private async Task<bool> ShouldAllowRewatch(
+            SimklScrobbleAction action,
+            double progress,
+            string sessionId,
+            UserConfig userConfig,
+            string name)
+        {
+            if (action != SimklScrobbleAction.Stop || progress < RetryThreshold || !userConfig.EnableRewatches)
+            {
+                return false;
+            }
+
+            if (_sessions.TryGetValue(sessionId, out var state) && progress - state.StartProgress < MinRewatchSpan)
+            {
+                _logger.LogInformation(
+                    "Not offering {Name} as a rewatch: only {Span:0.#}% of it played this session",
+                    name,
+                    progress - state.StartProgress);
+                return false;
+            }
+
+            if (!await IsPaidAccount(userConfig).ConfigureAwait(false))
+            {
+                _logger.LogInformation(
+                    "Not offering {Name} as a rewatch: Simkl only tracks rewatches on Pro/VIP accounts (this one is {Plan})",
+                    name,
+                    userConfig.AccountType);
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Tells whether the user's Simkl plan supports rewatches. The settings
+        /// call is activity-gated, so this costs nothing most of the time. An
+        /// unknown plan is let through: Simkl then decides.
         /// </summary>
         private async Task<bool> IsPaidAccount(UserConfig userConfig)
         {
-            var stale = userConfig.AccountTypeCheckedUtc == null
-                        || DateTime.UtcNow - userConfig.AccountTypeCheckedUtc.Value > _accountTypeTtl;
-            if (string.IsNullOrEmpty(userConfig.AccountType) || stale)
+            string? plan = null;
+            try
             {
-                try
-                {
-                    var settings = await _simklApi.GetUserSettings(userConfig.UserToken).ConfigureAwait(false);
-                    var plan = settings?.Account?.Type;
-                    if (!string.IsNullOrEmpty(plan))
-                    {
-                        userConfig.AccountType = plan;
-                        userConfig.AccountTypeCheckedUtc = DateTime.UtcNow;
-                        SimklPlugin.Instance?.SaveConfiguration();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogDebug(ex, "Could not read the Simkl plan for the rewatch check");
-                }
+                var settings = await _simklApi.GetUserSettings(userConfig.UserToken).ConfigureAwait(false);
+                plan = settings?.Account?.Type;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Could not read the Simkl plan for the rewatch check");
             }
 
-            return string.IsNullOrEmpty(userConfig.AccountType)
-                   || string.Equals(userConfig.AccountType, "pro", StringComparison.OrdinalIgnoreCase)
-                   || string.Equals(userConfig.AccountType, "vip", StringComparison.OrdinalIgnoreCase);
+            plan ??= userConfig.AccountType;
+            return string.IsNullOrEmpty(plan)
+                   || string.Equals(plan, "pro", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(plan, "vip", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -847,24 +651,10 @@ namespace Jellyfin.Plugin.Simkl.Services
             public bool Ignore { get; set; }
 
             /// <summary>
-            /// Gets or sets a value indicating whether the user had already
-            /// watched this item when playback started, which makes finishing
-            /// it a rewatch rather than a first watch.
-            /// </summary>
-            public bool WasAlreadyWatched { get; set; }
-
-            /// <summary>
             /// Gets or sets the progress the session started at, used to tell a
             /// real viewing from resuming near the end or skipping ahead.
             /// </summary>
             public double StartProgress { get; set; }
-
-            /// <summary>
-            /// Gets or sets a value indicating whether a rewatch has already
-            /// been recorded for this session, so repeated stop events (pause,
-            /// resume, a client sending stop twice) can't file it again.
-            /// </summary>
-            public bool RewatchRecorded { get; set; }
 
             /// <summary>
             /// Gets or sets the last scrobble action that was successfully sent.
