@@ -1,7 +1,7 @@
 ---
 name: "Simkl Scrobbler"
 guid: "03A7C840-6154-471F-8BE3-856CDC26D500"
-version: "9.3.1.7"
+version: "9.4.0.0"
 targetAbi: "10.11.7.0"
 framework: "net9.0"
 owner: "romskidd"
@@ -13,6 +13,20 @@ category: "General"
 artifacts:
   - "Jellyfin.Plugin.Simkl.dll"
 changelog: |-
-  - Rewatches: finishing something you had already watched is now recorded as a
-    separate Simkl rewatch session instead of doing nothing. Off by default,
-    and only offered on Simkl Pro/VIP accounts, which is what Simkl requires.
+  - Rewatches (Simkl Pro / VIP): finishing something you had already watched is
+    now recorded as a separate Simkl rewatch session, and later episodes of the
+    same show join that session. Off by default; only fires when Jellyfin or
+    Simkl already listed the item as watched and at least half of it played in
+    this session. Not offered on free plans, where Simkl does not track rewatches.
+  - The plugin now runs as its own Simkl application. Simkl tokens are bound to
+    the application that issued them, so after this update every user has to
+    link their Simkl account again, once (the plugin shows "Link expired").
+    Links Simkl no longer accepts are detected at startup and on the settings
+    pages instead of looking connected while nothing scrobbles.
+  - "Open on Simkl" link next to the last scrobble, and the last rewatch shown,
+    on both the admin page and the self-service page.
+  - Requests are paced to Simkl's one-write-per-second limit per user.
+  - Security pass: admin endpoints require an administrator, tokens never reach
+    the logs or the browser console, redirect and code parameters are escaped.
+  - Entering the PIN now lands on a confirmation page instead of the Simkl home.
+  - The server log explains every rewatch decision at Information level.

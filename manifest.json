@@ -9,6 +9,14 @@
         "imageUrl": "",
         "versions": [
             {
+                "version": "9.4.0.0",
+                "changelog": "Rewatches (Simkl Pro / VIP): finishing something you had already watched is now recorded as a separate Simkl rewatch session, and later episodes of the same show join that session. Off by default; only fires when Jellyfin or Simkl already listed the item as watched and at least half of it played in this session. Not offered on free plans, where Simkl does not track rewatches. The plugin now runs as its own Simkl application. Simkl tokens are bound to the application that issued them, so after this update every user has to link their Simkl account again, once (the plugin shows \"Link expired\"). Links Simkl no longer accepts are detected at startup and on the settings pages instead of looking connected while nothing scrobbles. \"Open on Simkl\" link next to the last scrobble, and the last rewatch shown, on both the admin page and the self-service page. Requests are paced to Simkl's one-write-per-second limit per user. Security pass: admin endpoints require an administrator, tokens never reach the logs or the browser console, redirect and code parameters are escaped. Entering the PIN now lands on a confirmation page instead of the Simkl home. The server log explains every rewatch decision at Information level.",
+                "targetAbi": "10.11.7.0",
+                "sourceUrl": "https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/releases/download/V9.4.0.0/Simkl_Scrobbler_9.4.0.0.zip",
+                "checksum": "dc13165605548971025f088afa422da2",
+                "timestamp": "2026-09-02T19:30:03Z"
+            },
+            {
                 "version": "9.3.0.0",
                 "changelog": "Self-service linking: any Jellyfin user can now connect their own Simkl account from a page of their own, without dashboard access (the admin settings page shows the link to share; the optional Plugin Pages plugin also adds it to the user sidebar, but is never required). Watches that Simkl doesn't confirm are queued and replayed for up to 24 hours, surviving a server restart, so a network blip no longer loses an episode. Per-user library exclusions. An expired Simkl login is now reported instead of failing silently. The plugin appears in the dashboard sidebar and the settings page was redesigned.",
                 "targetAbi": "10.11.7.0",
@@ -45,7 +53,7 @@
         "versions": [
             {
                 "version": "9.0.0.5",
-                "changelog": "FINAL release under this plugin id \u2014 the plugin continues as 'Simkl Scrobbler' (new plugin id) in this same repository. After updating, install 'Simkl Scrobbler' from the catalog, then uninstall this one; your Simkl login and settings are kept. This release still scrobbles normally (9.0.0.4 series-ids fix included) and goes dormant automatically once Simkl Scrobbler is installed.",
+                "changelog": "FINAL release under this plugin id — the plugin continues as 'Simkl Scrobbler' (new plugin id) in this same repository. After updating, install 'Simkl Scrobbler' from the catalog, then uninstall this one; your Simkl login and settings are kept. This release still scrobbles normally (9.0.0.4 series-ids fix included) and goes dormant automatically once Simkl Scrobbler is installed.",
                 "targetAbi": "10.11.7.0",
                 "sourceUrl": "https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/releases/download/V9.0.0.5/Simkl_9.0.0.5.zip",
                 "checksum": "ab03cdcd14ff45a53803288a5b6e8feb",
