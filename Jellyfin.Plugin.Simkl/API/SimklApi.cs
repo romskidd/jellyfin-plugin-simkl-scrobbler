@@ -399,7 +399,7 @@ namespace Jellyfin.Plugin.Simkl.API
             var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogDebug("Rewatch write returned {Status}", response.StatusCode);
+                _logger.LogWarning("Rewatch write returned {Status}", response.StatusCode);
                 return null;
             }
 
@@ -424,9 +424,13 @@ namespace Jellyfin.Plugin.Simkl.API
             }
             catch (JsonException ex)
             {
-                _logger.LogDebug(ex, "Could not read the rewatch id from the response");
+                _logger.LogWarning(ex, "Could not read the rewatch id from the response");
             }
 
+            // The body carries only counters and ids, never credentials.
+            _logger.LogInformation(
+                "Rewatch write accepted without a rewatch session; Simkl answered: {Body}",
+                body.Length > 400 ? body.Substring(0, 400) + "..." : body);
             return null;
         }
 

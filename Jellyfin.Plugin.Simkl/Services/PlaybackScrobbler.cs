@@ -383,7 +383,7 @@ namespace Jellyfin.Plugin.Simkl.Services
                 {
                     if (progress - finished.StartProgress < MinRewatchSpan)
                     {
-                        _logger.LogDebug(
+                        _logger.LogInformation(
                             "Not filing a rewatch of {Name}: only {Span:0.#}% of it played this session",
                             mediaInfo.Name,
                             progress - finished.StartProgress);
@@ -439,6 +439,7 @@ namespace Jellyfin.Plugin.Simkl.Services
                 if (user != null && libraryItem != null
                     && _userDataManager.GetUserData(user, libraryItem)?.Played == true)
                 {
+                    _logger.LogInformation("Jellyfin already lists {Name} as played before this playback", item.Name);
                     return true;
                 }
             }
@@ -468,10 +469,16 @@ namespace Jellyfin.Plugin.Simkl.Services
                 var watched = await _simklApi.IsWatchedAsync(query, userToken).ConfigureAwait(false);
                 if (watched != null)
                 {
-                    _logger.LogDebug(
+                    _logger.LogInformation(
                         "Simkl reports {Name} as {State} before this playback",
                         item.Name,
                         watched.Value ? "already watched" : "not watched");
+                }
+                else
+                {
+                    _logger.LogInformation(
+                        "Simkl could not tell whether {Name} was watched before; treating it as a first watch",
+                        item.Name);
                 }
 
                 return watched == true;
@@ -557,8 +564,12 @@ namespace Jellyfin.Plugin.Simkl.Services
                 }
                 else
                 {
-                    // Most often a free Simkl account, where the call is a no-op.
-                    _logger.LogDebug("Simkl didn't report a rewatch session for {Name}", item.Name);
+                    // A free Simkl account, or a title watched again too soon
+                    // after the previous time: Simkl accepts the write but opens
+                    // no rewatch session.
+                    _logger.LogInformation(
+                        "Simkl did not open a rewatch session for {Name} (free account, or watched again too soon)",
+                        item.Name);
                 }
             }
             catch (InvalidTokenException)
