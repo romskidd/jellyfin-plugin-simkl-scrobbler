@@ -333,7 +333,8 @@
                             <div class="fieldDescription">
                                 When you finish something you had already watched, it is filed as a
                                 rewatch on Simkl instead of doing nothing. <strong>Simkl Pro or VIP
-                                only</strong> — on a free account Simkl silently ignores it.
+                                only.</strong>
+                                <span id="rewatchPlanNote" hidden> Your Simkl account is on the free plan, so this option is not available.</span>
                             </div>
                         </div>
                     </div>
@@ -577,6 +578,17 @@
                     }
                     const name = (settings && settings.user && settings.user.name) ? settings.user.name : 'Simkl user';
                     const plan = (settings && settings.account && settings.account.type) ? settings.account.type.toUpperCase() : null;
+                    // Rewatches are a paid Simkl feature: on a free plan the switch
+                    // stays off and locked, with a note saying why. An unknown plan
+                    // (settings unavailable) leaves it usable.
+                    const freePlan = plan !== null && ['PRO', 'VIP'].indexOf(plan) === -1;
+                    const rewatchBox = document.querySelector('#EnableRewatches');
+                    rewatchBox.disabled = freePlan;
+                    if (freePlan) {
+                        rewatchBox.checked = false;
+                        userConfig.EnableRewatches = false;
+                    }
+                    document.querySelector('#rewatchPlanNote').hidden = !freePlan;
                     SimklConfig.setConnectionPill(
                         'Account connected: ' + name + (plan ? ' - ' + plan : '') + (profile ? ' to ' + profile : ''),
                         true);
