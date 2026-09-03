@@ -1,6 +1,6 @@
 <h1 align="center">RK Simkl Scrobbler for Jellyfin</h1>
 <h3 align="center">Real-time Simkl scrobbling</h3>
-<p align="center"><em>Unofficial plugin, not affiliated with or endorsed by Simkl. Simkl is a trademark of its owners; this is an independent community project.</em></p>
+<p align="center"><em>Unofficial plugin, not affiliated with or endorsed by Simkl or Jellyfin. Simkl and Jellyfin are trademarks of their respective owners; this is an independent community project.</em></p>
 
 > [!WARNING]
 > **Installed a version ≤ 9.0.0.4 of this plugin (before 2026-08-30)?**

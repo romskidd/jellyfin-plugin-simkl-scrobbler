@@ -2,7 +2,7 @@
     {
         "guid": "03a7c840-6154-471f-8be3-856cdc26d500",
         "name": "RK Simkl Scrobbler",
-        "description": "Unofficial plugin, not affiliated with or endorsed by Simkl. Scrobble your watched Movies, TV Shows and Anime to Simkl in real time. Reports start, pause and stop as you watch, shows the title in your Simkl 'Watching now' banner, and marks items watched automatically once you stop past 80%.",
+        "description": "Unofficial plugin, not affiliated with or endorsed by Simkl or Jellyfin. Scrobble your watched Movies, TV Shows and Anime to Simkl in real time. Reports start, pause and stop as you watch, shows the title in your Simkl 'Watching now' banner, and marks items watched automatically once you stop past 80%.",
         "overview": "Real-time Simkl scrobbling for Jellyfin (unofficial)",
         "owner": "romskidd",
         "category": "General",

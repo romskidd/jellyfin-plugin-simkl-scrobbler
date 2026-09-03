@@ -360,7 +360,7 @@ namespace Jellyfin.Plugin.Simkl.Services
                 {
                     RecordLastRewatch(userConfig, mediaInfo, result.Rewatch);
                     _logger.LogInformation(
-                        "Recorded a rewatch of {Name} (Simkl session {Session}, {State})",
+                        "Recorded a rewatch of {Name} (Simkl session {Session}, {State:l})",
                         mediaInfo.Name,
                         result.Rewatch.Id,
                         result.Rewatch.Status ?? "open");

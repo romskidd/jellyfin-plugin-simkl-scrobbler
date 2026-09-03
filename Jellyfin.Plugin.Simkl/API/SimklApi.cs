@@ -60,7 +60,7 @@ namespace Jellyfin.Plugin.Simkl.API
         /// App identifier sent with every request, as required by the Simkl API
         /// (see api.simkl.org/conventions/headers).
         /// </summary>
-        private const string AppName = "jellyfin-plugin-simkl-scrobbler";
+        private const string AppName = "rk-simkl-scrobbler";
 
         /// <summary>
         /// Plugin version reported to Simkl alongside <see cref="AppName"/>.
@@ -675,7 +675,7 @@ namespace Jellyfin.Plugin.Simkl.API
         {
             var requestMessage = new HttpRequestMessage();
             requestMessage.Headers.TryAddWithoutValidation("simkl-api-key", Apikey);
-            requestMessage.Headers.UserAgent.Add(new ProductInfoHeaderValue("jellyfin-plugin-simkl-scrobbler", _appVersion));
+            requestMessage.Headers.UserAgent.Add(new ProductInfoHeaderValue("rk-simkl-scrobbler", _appVersion));
             if (!string.IsNullOrEmpty(userToken))
             {
                 requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", userToken);
