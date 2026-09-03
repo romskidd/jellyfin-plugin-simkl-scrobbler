@@ -483,9 +483,8 @@ namespace Jellyfin.Plugin.Simkl.API
                     _logger.LogInformation("Simkl did not file a rewatch: the account is not Pro/VIP (rewatch_status pro_required)");
                 }
 
-                // The rewatch flag on scrobble is new and not documented yet:
-                // keep the answer visible while the shape settles. Ids only.
-                _logger.LogInformation(
+                // Ids only in there; handy when Simkl changes the shape.
+                _logger.LogDebug(
                     "Scrobble stop with allow_rewatch answered: {Body}",
                     text.Length > 400 ? text.Substring(0, 400) + "..." : text);
             }
