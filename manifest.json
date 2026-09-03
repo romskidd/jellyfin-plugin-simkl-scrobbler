@@ -1,9 +1,9 @@
 [
     {
         "guid": "03a7c840-6154-471f-8be3-856cdc26d500",
-        "name": "Simkl Scrobbler",
-        "description": "Scrobble your watched Movies, TV Shows and Anime to Simkl in real time. Reports start, pause and stop as you watch, shows the title in your Simkl 'Watching now' banner, and marks items watched automatically once you stop past 80%.",
-        "overview": "Real-time Simkl scrobbling for Jellyfin",
+        "name": "RK Simkl Scrobbler",
+        "description": "Unofficial plugin, not affiliated with or endorsed by Simkl. Scrobble your watched Movies, TV Shows and Anime to Simkl in real time. Reports start, pause and stop as you watch, shows the title in your Simkl 'Watching now' banner, and marks items watched automatically once you stop past 80%.",
+        "overview": "Real-time Simkl scrobbling for Jellyfin (unofficial)",
         "owner": "romskidd",
         "category": "General",
         "imageUrl": "",
@@ -44,16 +44,16 @@
     },
     {
         "guid": "07caef58-a94b-4211-a62c-f9774e04ebdb",
-        "name": "Simkl (moved to Simkl Scrobbler)",
-        "description": "THIS PLUGIN HAS MOVED: install 'Simkl Scrobbler' from the same repository to keep receiving updates, then uninstall this one. Your Simkl login and settings are kept. Scrobbling keeps working in the meantime.",
-        "overview": "This plugin has moved to Simkl Scrobbler",
+        "name": "Simkl (moved to RK Simkl Scrobbler)",
+        "description": "THIS PLUGIN HAS MOVED: install 'RK Simkl Scrobbler' from the same repository to keep receiving updates, then uninstall this one. Your Simkl login and settings are kept. Scrobbling keeps working in the meantime.",
+        "overview": "This plugin has moved to RK Simkl Scrobbler",
         "owner": "romskidd",
         "category": "General",
         "imageUrl": "",
         "versions": [
             {
                 "version": "9.0.0.5",
-                "changelog": "FINAL release under this plugin id — the plugin continues as 'Simkl Scrobbler' (new plugin id) in this same repository. After updating, install 'Simkl Scrobbler' from the catalog, then uninstall this one; your Simkl login and settings are kept. This release still scrobbles normally (9.0.0.4 series-ids fix included) and goes dormant automatically once Simkl Scrobbler is installed.",
+                "changelog": "FINAL release under this plugin id — the plugin continues as 'RK Simkl Scrobbler' (new plugin id) in this same repository. After updating, install 'Simkl Scrobbler' from the catalog, then uninstall this one; your Simkl login and settings are kept. This release still scrobbles normally (9.0.0.4 series-ids fix included) and goes dormant automatically once Simkl Scrobbler is installed.",
                 "targetAbi": "10.11.7.0",
                 "sourceUrl": "https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/releases/download/V9.0.0.5/Simkl_9.0.0.5.zip",
                 "checksum": "ab03cdcd14ff45a53803288a5b6e8feb",

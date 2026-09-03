@@ -117,7 +117,7 @@ namespace Jellyfin.Plugin.Simkl.Services
             {
                 ["Id"] = EntryId,
                 ["Url"] = PageUrl,
-                ["DisplayText"] = "Simkl Scrobbler",
+                ["DisplayText"] = "RK Simkl Scrobbler",
                 ["Icon"] = "sync",
                 ["Version"] = 1
             });

@@ -1,13 +1,14 @@
 ---
-name: "Simkl Scrobbler"
+name: "RK Simkl Scrobbler"
 guid: "03A7C840-6154-471F-8BE3-856CDC26D500"
-version: "9.4.0.4"
+version: "9.4.0.5"
 targetAbi: "10.11.7.0"
 framework: "net9.0"
 owner: "romskidd"
-overview: "Real-time Simkl scrobbling"
+overview: "Real-time Simkl scrobbling (unofficial plugin)"
 description: >
   Scrobble your watched Movies, TV Shows and Anime to Simkl in real time and share your progress with friends!
+  Unofficial plugin, not affiliated with or endorsed by Simkl.
 
 category: "General"
 artifacts:

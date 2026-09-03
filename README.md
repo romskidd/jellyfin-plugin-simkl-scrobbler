@@ -1,11 +1,12 @@
-<h1 align="center">Simkl Scrobbler for Jellyfin</h1>
+<h1 align="center">RK Simkl Scrobbler for Jellyfin</h1>
 <h3 align="center">Real-time Simkl scrobbling</h3>
+<p align="center"><em>Unofficial plugin, not affiliated with or endorsed by Simkl. Simkl is a trademark of its owners; this is an independent community project.</em></p>
 
 > [!WARNING]
 > **Installed a version ≤ 9.0.0.4 of this plugin (before 2026-08-30)?**
 > The plugin changed its id in **9.1.0.0** and is now fully independent from the
 > official Simkl plugin — old installs will **not** receive updates anymore.
-> One-time fix: uninstall the old "Simkl" plugin, then install **"Simkl Scrobbler"**
+> One-time fix: uninstall the old "Simkl" plugin, then install **"RK Simkl Scrobbler"**
 > from the same repo URL below. Your Simkl login and settings are kept.
 > Details in [the pinned issue](https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/issues).
 
@@ -26,7 +27,7 @@ The official plugin only marks items as watched **after** playback (via Simkl's
 `start` / `pause` / `stop` lifecycle, the live "Watching now" banner on simkl.com,
 and automatic watched-marking at 80%.
 
-Since version **9.1.0.0** it is a fully independent plugin ("Simkl Scrobbler",
+Since version **9.1.0.0** it is a fully independent plugin ("RK Simkl Scrobbler", formerly "Simkl Scrobbler",
 maintained by [romskidd](https://github.com/romskidd)) with its own plugin id:
 
 - It can never be overwritten by an update of the official plugin, and its
@@ -35,7 +36,7 @@ maintained by [romskidd](https://github.com/romskidd)) with its own plugin id:
 - Don't run it together with the official Simkl plugin — both would scrobble
   the same playbacks twice. Install one or the other.
 - If you installed a version **≤ 9.0.0.4** of this fork (which still shared the
-  official plugin id): uninstall it, then install "Simkl Scrobbler" from this
+  official plugin id): uninstall it, then install "RK Simkl Scrobbler" from this
   repo. Your Simkl login and settings are kept (the configuration file is
   unchanged).
 
@@ -45,7 +46,7 @@ Dashboard → Plugins → Repositories → add:
 ```
 https://raw.githubusercontent.com/romskidd/jellyfin-plugin-simkl-scrobbler/master/manifest.json
 ```
-Then add "Simkl Scrobbler" from your addon list and restart jellyfin. You will find options for Simkl Scrobbler in your extensions list on the left panel in the dashboard.
+Then add "RK Simkl Scrobbler" from your addon list and restart jellyfin. You will find options for RK Simkl Scrobbler in your extensions list on the left panel in the dashboard.
 
 ###
 

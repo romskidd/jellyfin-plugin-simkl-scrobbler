@@ -33,7 +33,7 @@ namespace Jellyfin.Plugin.Simkl
         public override Guid Id => new Guid("03A7C840-6154-471F-8BE3-856CDC26D500");
 
         /// <inheritdoc />
-        public override string Name => "Simkl Scrobbler";
+        public override string Name => "RK Simkl Scrobbler";
 
         /// <inheritdoc />
         public override string Description => "Scrobble your watched Movies, TV Shows and Anime to Simkl and share your progress with friends!";
@@ -49,7 +49,7 @@ namespace Jellyfin.Plugin.Simkl
                 // Show the plugin in the dashboard's left sidebar instead of
                 // hiding it behind the plugin catalogue.
                 EnableInMainMenu = true,
-                DisplayName = "Simkl Scrobbler",
+                DisplayName = "RK Simkl Scrobbler",
                 MenuIcon = "sync"
             };
         }
