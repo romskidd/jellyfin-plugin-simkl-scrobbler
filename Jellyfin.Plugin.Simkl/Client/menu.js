@@ -97,11 +97,13 @@
         }
     }
 
-    // Menus are built on demand: watch for new nodes, one pass per frame at most.
+    // Menus are built on demand: watch for new nodes, one pass per tick at most.
+    // A timer rather than requestAnimationFrame: frames stop in a background
+    // tab, and a pass scheduled there would otherwise never run.
     function schedule() {
         if (!scheduled) {
             scheduled = true;
-            window.requestAnimationFrame(run);
+            window.setTimeout(run, 0);
         }
     }
 

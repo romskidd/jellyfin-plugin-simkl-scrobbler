@@ -13,8 +13,8 @@
                 "changelog": "Every user now finds an \"RK Simkl Scrobbler\" entry in their own menu, leading to the self-service page where they link their Simkl account and set their options, with nothing else to install. The plugin adds the entry to the web client as the page is served, on Jellyfin 10.11 (side drawer) as on 12 (avatar menu), without touching any file on disk. It can be turned off from the admin page. The optional Plugin Pages integration is retired: the entry it used to register is removed at startup, so the page never shows twice. Plugin Pages and File Transformation are no longer needed for anything. The self-service page shows a \"Back to Jellyfin\" link when opened on its own.",
                 "targetAbi": "10.11.7.0",
                 "sourceUrl": "https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/releases/download/V9.7.1.0/RK_Simkl_Scrobbler_9.7.1.0.zip",
-                "checksum": "c07650a37f8f135c954d2d713d422c05",
-                "timestamp": "2026-09-12T21:24:25Z"
+                "checksum": "b2683d91efd88473ea75d6f2e8e97f39",
+                "timestamp": "2026-09-12T21:52:27Z"
             },
             {
                 "version": "9.7.0.0",

@@ -77,8 +77,12 @@ namespace Jellyfin.Plugin.Simkl.Services
             var full = request.PathBase.Value + request.Path.Value;
             var index = full.LastIndexOf("/web", StringComparison.OrdinalIgnoreCase);
             var prefix = index > 0 ? full.Substring(0, index) : string.Empty;
+            // The version plus this build's own id: caches in front of the server
+            // (browser, proxy, CDN) then never serve a stale script, not even for
+            // two builds carrying the same version number.
             var version = SimklPlugin.Instance?.Version?.ToString() ?? "0";
-            return "<script src=\"" + prefix + ScriptPath + "?v=" + Uri.EscapeDataString(version) + "\" defer></script>";
+            var build = typeof(WebClientInjection).Assembly.ManifestModule.ModuleVersionId.ToString("N").Substring(0, 8);
+            return "<script src=\"" + prefix + ScriptPath + "?v=" + Uri.EscapeDataString(version + "-" + build) + "\" defer></script>";
         }
 
         private async Task InvokeAsync(HttpContext context, Func<Task> next)
