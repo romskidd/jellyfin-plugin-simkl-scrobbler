@@ -258,14 +258,8 @@
                 #SimklConfigurationForm { max-width: 1400px; }
                 #SimklConfigurationPage .simklLinkBanner { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.1em; padding: 0.75em 1.1em; border-radius: 10px; border: 1px solid rgba(0, 164, 220, 0.45); border-left: 5px solid #00a4dc; background: linear-gradient(90deg, rgba(0, 164, 220, 0.2), rgba(0, 164, 220, 0.04)); }
                 #SimklConfigurationPage .simklLinkIcon { font-size: 1.9em; color: #00a4dc; flex: none; }
-                #SimklConfigurationPage .simklLinkText { display: flex; flex-direction: column; gap: 0.15rem; flex: 1 1 20rem; min-width: 0; font-size: 0.95em; }
+                #SimklConfigurationPage .simklLinkText { display: flex; flex-direction: column; gap: 0.15rem; flex: 1 1 18rem; min-width: 0; font-size: 0.95em; }
                 #SimklConfigurationPage .simklLinkBanner .simklLinkRow { flex: 1 1 24rem; margin: 0; }
-                #SimklConfigurationPage .simklMenuSwitch { margin: 0.3rem 0 0.15rem; }
-                #SimklConfigurationPage .simklMenuSwitch label { margin: 0; }
-                #SimklConfigurationPage .simklMenuSwitch span { font-weight: 600; font-size: 1.05em; }
-                #SimklConfigurationPage .simklLinkAlt { display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap; margin-top: 0.7rem; padding-top: 0.6rem; border-top: 1px dashed rgba(0, 164, 220, 0.35); font-size: 0.86em; }
-                #SimklConfigurationPage .simklLinkAlt .simklUrlInput { flex: 1 1 16rem; max-width: 34rem; font-size: 0.92em; padding: 0.3em 0.6em; }
-                #SimklConfigurationPage .simklLinkAlt .simklLogout { min-width: 0; padding: 0.3em 0.9em; font-size: 0.88em; }
                 #SimklConfigurationPage .simklTabBar { display: flex; gap: 0.3rem; flex-wrap: wrap; border-bottom: 2px solid rgba(127,127,127,0.25); margin: 0 0 1.2em; }
                 #SimklConfigurationPage .simklTab { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.8rem 1.3rem; margin-bottom: -2px; background: transparent; color: inherit; border: 0; border-bottom: 3px solid transparent; border-radius: 0.5rem 0.5rem 0 0; opacity: 0.7; font: inherit; font-size: 1.05em; font-weight: 600; cursor: pointer; }
                 #SimklConfigurationPage .simklTab .material-icons { font-size: 1.3em; }
@@ -370,22 +364,15 @@
 
             <form id="SimklConfigurationForm">
                 <div class="simklLinkBanner">
-                    <span class="material-icons simklLinkIcon" aria-hidden="true">group</span>
+                    <span class="material-icons simklLinkIcon" aria-hidden="true">link</span>
                     <div class="simklLinkText">
-                        <strong>Your users</strong>
-                        <div class="checkboxContainer simklMenuSwitch">
-                            <label>
-                                <input is="emby-checkbox" type="checkbox" id="ShowMenuEntry"/>
-                                <span>Show an "RK Simkl Scrobbler" entry in every user's menu</span>
-                            </label>
-                        </div>
-                        <span class="simklMuted">From there, signed in to Jellyfin, they link their own Simkl account and set their options. Nothing else to install; applies after Save, the next time the web client loads.</span>
-                        <div class="simklLinkAlt">
-                            <span class="simklMuted">Direct link, if you'd rather share it yourself:</span>
-                            <input id="selfServiceUrl" type="text" readonly class="simklUrlInput"/>
-                            <button is="emby-button" type="button" class="raised simklLogout"
-                                    onclick="SimklConfig.copySelfServiceUrl();"><span>Copy</span></button>
-                        </div>
+                        <strong>Link for your users</strong>
+                        <span class="simklMuted">Signed in to Jellyfin, they connect their own Simkl account and set their options there. Also in their sidebar with the optional Plugin Pages plugin.</span>
+                    </div>
+                    <div class="simklLinkRow">
+                        <input id="selfServiceUrl" type="text" readonly class="simklUrlInput"/>
+                        <button is="emby-button" type="button" class="raised simklLogout"
+                                onclick="SimklConfig.copySelfServiceUrl();"><span>Copy</span></button>
                     </div>
                 </div>
 
@@ -1091,12 +1078,6 @@
 
                 console.log("Simkl: loading config for user " + user);
 
-                // Server-wide switch, not part of any profile.
-                const menuBox = document.querySelector('#ShowMenuEntry');
-                if (menuBox) {
-                    menuBox.checked = config.ShowMenuEntry !== false;
-                }
-
                 SimklConfig.loginButtonContainer.setAttribute('hidden', '');
                 SimklConfig.configOptionsContainer.setAttribute('hidden', '')
 
@@ -1148,8 +1129,6 @@
                 uconfig.ExcludedLibraries = Array.prototype.slice
                     .call(document.querySelectorAll('#excludedLibraries input:checked'))
                     .map(function (input) { return input.value; });
-
-                this.configCache.ShowMenuEntry = document.querySelector('#ShowMenuEntry').checked;
 
                 ApiClient.updatePluginConfiguration(this.guid, this.configCache).then(function (result) {
                     Dashboard.processPluginConfigurationUpdateResult(result);

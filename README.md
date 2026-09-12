@@ -21,9 +21,9 @@ does not cover:
 
 - **Users link their own Simkl account themselves.** The official plugin already keeps a
   separate Simkl login per Jellyfin profile, but only an administrator can set each one up
-  from the dashboard. Here every user has an **RK Simkl Scrobbler** entry in their own
-  menu and links their own account from there, with their own settings — no dashboard
-  access, nothing else to install.
+  from the dashboard. Here a user without dashboard access opens a self-service page and
+  links their own account, with their own settings — you never have to hand out
+  administrator rights to a friend.
 - **The history syncs both ways.** Bring a Simkl history into a fresh Jellyfin library,
   send what Jellyfin already knows to Simkl, or keep the two aligned from then on — with
   a preview before every write and a 7-day undo. *(Requested upstream in
@@ -71,11 +71,10 @@ Simkl Pro or VIP, as Simkl only offers it there.
 - **Administrators**: open the plugin page in the dashboard, pick a Jellyfin profile,
   click **Log In**, enter the code at simkl.com/pin. The page updates on its own once
   Simkl accepts the code.
-- **Everyone else**: every user finds an **RK Simkl Scrobbler** entry in their own
-  menu (the avatar menu on Jellyfin 12, the side drawer on 10.11), leading to a
-  self-service page where they link their own account and set their options. No
-  dashboard access, nothing else to install. The administrator can also share the
-  page's link, shown on the plugin page, and can turn the menu entry off there.
+- **Everyone else**: the plugin has a self-service page that any user can open
+  without dashboard access. The administrator finds the link to share on the plugin
+  page. If the optional [Plugin Pages](https://github.com/IAmParadox27/jellyfin-plugin-pages)
+  plugin is installed, the page is also listed in the user sidebar; it is never required.
 
 Each profile keeps its own Simkl login and settings.
 
@@ -202,7 +201,6 @@ their review. Feedback, bug reports and ideas are welcome in the
 
 | Version | Date | Changes |
 |---|---|---|
-| **9.7.1.0** | 2026-09-12 | Every user gets an **RK Simkl Scrobbler entry in their own menu** (avatar menu on 12, side drawer on 10.11), leading to the self-service page, with nothing else to install: the plugin adds it to the web client as the page is served, never touching a file on disk; a switch on the admin page turns it off. The Plugin Pages integration is retired and its old entry removed at startup. "Back to Jellyfin" link on the standalone self-service page. |
 | **9.7.0.0** | 2026-09-12 | First stable release with the **two-way Simkl sync** (three steps from the *Import / Export & sync* tab, guided by a status box; import and export also work on their own; preview before every write, a click on any result number lists the titles, 7-day undo both ways, confirmation above 200 changes, excluded libraries untouched, anime not covered). One build now runs on **Jellyfin 10.11.x and 12** — the self-service page authenticates the way 12 requires, and every path was checked on a 12.0 server. **Logs** tab with a diagnostic report carrying no tokens. The plugin has a **logo**. Watches kept while a link is expired, unmatched items retried after a scan, server-wide request pacing. Both settings pages redesigned, the self-service one matching the admin one. |
 | **9.6.1.0** (Beta 3) | 2026-09-08 | Runs on **Jellyfin 12** as well as 10.11: the self-service page authenticates the way 12 requires, and every other path was checked on a 12.0 server. The plugin has a **logo** (RK monogram cut through by the scrobble pulse), shown in the catalogue and on both settings pages. A **click on any result number** opens the list of the items behind it. |
 | **9.6.0.0** (Beta 2) | 2026-09-07 | **Simkl sync** (experimental, beta channel): three-step setup, 1. Simkl to Jellyfin, 2. Jellyfin to Simkl, 3. Keep in sync (after each playback and library scan, at most hourly). Preview before every write, 7-day undo both ways, confirmation above 200 changes, excluded libraries untouched, anime not covered, unmatched items retried after each scan, per linked profile. Finished watches kept while a link is expired (30 days). **Logs** tab with a diagnostic report. Settings pages redesigned (users' link, profile, then tabs) and wider, self-service page styled like the admin page. Simkl reads paced like writes, plus server-wide pacing. Beta 2 (2026-09-07): sync state tied to the Simkl account (relinking another account starts over); step 2 skips what Simkl already has, never moves watch dates, its undo only removes what it added; admin saves keep the server's account and sync fields; rejected logins detected on every call, refused history writes not counted as sent; self-service library list limited to what the user may see. Tab renamed Import / Export & sync with a guided status box (Preview import > Import > Preview export > Export > Turn on sync, result counters, animated when the sync is on, ? help) and independent Import / Export cards; step 3 is an immediate Turn on / Turn off sync button, Manual resync while on. |

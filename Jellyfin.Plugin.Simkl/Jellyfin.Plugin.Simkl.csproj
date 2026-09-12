@@ -22,8 +22,6 @@
       <EmbeddedResource Include="Configuration\configPage.html" />
       <None Remove="Configuration\linkPage.html" />
       <EmbeddedResource Include="Configuration\linkPage.html" />
-      <None Remove="Client\menu.js" />
-      <EmbeddedResource Include="Client\menu.js" />
     </ItemGroup>
 
     <PropertyGroup>

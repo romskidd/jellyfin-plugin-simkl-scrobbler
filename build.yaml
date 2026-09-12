@@ -1,7 +1,7 @@
 ---
 name: "RK Simkl Scrobbler"
 guid: "03A7C840-6154-471F-8BE3-856CDC26D500"
-version: "9.7.1.0"
+version: "9.7.0.0"
 targetAbi: "10.11.7.0"
 framework: "net9.0"
 owner: "romskidd"
@@ -14,14 +14,30 @@ category: "General"
 artifacts:
   - "Jellyfin.Plugin.Simkl.dll"
 changelog: |-
-  - Every user now finds an "RK Simkl Scrobbler" entry in their own menu,
-    leading to the self-service page where they link their Simkl account and set
-    their options, with nothing else to install. The plugin adds the entry to
-    the web client as the page is served, on Jellyfin 10.11 (side drawer) as on
-    12 (avatar menu), without touching any file on disk. It can be turned off
-    from the admin page.
-  - The optional Plugin Pages integration is retired: the entry it used to
-    register is removed at startup, so the page never shows twice. Plugin Pages
-    and File Transformation are no longer needed for anything.
-  - The self-service page shows a "Back to Jellyfin" link when opened on its
-    own.
+  - The Simkl sync leaves beta and reaches the stable channel. From the Import /
+    Export & sync tab: 1. Simkl to Jellyfin marks here what your Simkl history
+    lists as watched, original watch dates and play counts included, for the
+    items present in your libraries; 2. Jellyfin to Simkl sends what Jellyfin
+    has and Simkl does not, leaving alone what Simkl already knows; 3. Turn on
+    sync keeps both sides aligned after each playback and library scan, at most
+    once an hour. Off until you set it up.
+  - Import and export also work on their own, each from its own card. Every step
+    previews what it would change before writing anything, a click on any result
+    number lists the titles behind it, both directions can be undone for 7 days,
+    a pass changing more than 200 items waits for your confirmation, excluded
+    libraries are left alone, and anime is not covered.
+  - One build now runs on Jellyfin 10.11.x and on Jellyfin 12. The self-service
+    page authenticates the way 12 requires, so it no longer asks signed-in users
+    to sign in, and every other path was checked on a 12.0 server: linking,
+    scrobbling, the import and export passes, the sync switch and the Logs tab.
+  - A Logs tab builds a diagnostic report to paste into a bug report: versions,
+    a settings summary and the plugin's recent log lines, with no tokens in it.
+  - The plugin has a logo, an RK monogram cut through by the scrobble pulse,
+    shown in the plugin catalogue and at the top of both settings pages.
+  - Finished watches are kept while a Simkl link is expired and sent once the
+    account is linked again. Unmatched Simkl items are retried after a library
+    scan. Requests are paced server-wide as well as per user, so several
+    profiles cannot trip Simkl's burst detector.
+  - Both settings pages were redesigned around the link banner, the profile
+    selector and horizontal tabs, and the self-service page now matches the
+    admin one.

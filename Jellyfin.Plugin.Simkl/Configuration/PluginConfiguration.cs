@@ -15,20 +15,12 @@ namespace Jellyfin.Plugin.Simkl.Configuration
         public PluginConfiguration()
         {
             UserConfigs = Array.Empty<UserConfig>();
-            ShowMenuEntry = true;
         }
 
         /// <summary>
         /// Gets or sets the list of user configs.
         /// </summary>
         public UserConfig[] UserConfigs { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether every user gets an
-        /// "RK Simkl Scrobbler" entry in their menu, leading to the self-service
-        /// page. On by default.
-        /// </summary>
-        public bool ShowMenuEntry { get; set; }
 
         /// <summary>
         /// Get config by id.

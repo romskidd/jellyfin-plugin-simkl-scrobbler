@@ -2,7 +2,6 @@
 using Jellyfin.Plugin.Simkl.Services;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Jellyfin.Plugin.Simkl
@@ -22,11 +21,7 @@ namespace Jellyfin.Plugin.Simkl
             serviceCollection.AddHostedService(sp => sp.GetRequiredService<ScrobbleRetryQueue>());
             serviceCollection.AddHostedService<PlaybackScrobbler>();
             serviceCollection.AddHostedService<UserDataSync>();
-            serviceCollection.AddHostedService<PluginPagesCleanup>();
-
-            // The menu entry every user sees: a script tag added to the web
-            // client's index.html as it is served.
-            serviceCollection.AddSingleton<IStartupFilter, WebClientInjection>();
+            serviceCollection.AddHostedService<PluginPagesRegistration>();
             serviceCollection.AddHostedService<LinkValidation>();
             serviceCollection.AddSingleton<SimklImportService>();
             serviceCollection.AddHostedService(sp => sp.GetRequiredService<SimklImportService>());
