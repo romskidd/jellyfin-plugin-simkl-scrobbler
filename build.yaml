@@ -7,6 +7,9 @@ framework: "net9.0"
 owner: "romskidd"
 overview: "Real-time Simkl scrobbling (unofficial plugin)"
 description: >
+  WARNING: do not run this plugin alongside the official Simkl plugin. Both would
+  scrobble every playback and send each watched item twice; keep one of the two.
+
   Scrobble your watched Movies, TV Shows and Anime to Simkl in real time and share your progress with friends!
   Unofficial plugin, not affiliated with or endorsed by Simkl or Jellyfin.
 

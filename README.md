@@ -13,6 +13,11 @@ tracked, and the item is marked watched once you stop past 80%. Manual check mar
 rewatches and per-user settings are covered too. Each Jellyfin user links their own
 Simkl account.
 
+> [!WARNING]
+> **Do not run this plugin and the official Simkl plugin at the same time.** Both would
+> scrobble every playback and send each watched item to Simkl twice. Keep one of the two:
+> uninstall the other from Dashboard → Plugins before you link an account here.
+
 ## Why this one
 
 The official [Simkl plugin](https://github.com/jellyfin/jellyfin-plugin-simkl) is
