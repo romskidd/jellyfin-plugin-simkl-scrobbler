@@ -34,6 +34,14 @@ does not cover:
 Plus rewatch sessions, per-user library exclusions, and a Logs tab that builds a
 diagnostic report with no tokens in it.
 
+## What it looks like
+
+<p align="center"><img src="docs/screenshot-plugin-page.png" alt="The plugin's admin page, on the Import / Export & sync tab" width="900"></p>
+
+The **Import / Export & sync** tab: the guided box walks through the three steps, each
+button unlocking once the previous one has run, and the counters report what each pass
+did. Below it, the Import and Export cards let either direction run on its own.
+
 ## Installation
 
 1. In Jellyfin: **Dashboard → Plugins → Repositories → Add**, with this URL:
