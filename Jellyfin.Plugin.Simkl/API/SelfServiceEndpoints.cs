@@ -96,16 +96,22 @@ namespace Jellyfin.Plugin.Simkl.API
                        + "body{margin:0;padding:2.2rem 1.1rem 3rem;background:#101418;color:#f2f4f6;"
                        + "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}"
                        + "@media(prefers-color-scheme:light){body{background:#f4f6f8;color:#16191c}}"
-                       + "a{color:#00a4dc}</style>\n</head>\n<body>\n"
+                       + "a{color:#00a4dc}"
+                       + ".simklBackBar{max-width:1400px;margin:0 auto 0.9rem;padding:0 0.2rem}"
+                       + ".simklBackBar a{text-decoration:none;font-size:0.95rem;opacity:0.85}"
+                       + ".simklBackBar a:hover{opacity:1}</style>\n</head>\n<body>\n"
+                       + "<div class=\"simklBackBar\"><a id=\"simklBack\" href=\"../web/\">&larr; Back to Jellyfin</a></div>\n"
                        + fragment
+                       + "\n<script>(function(){var a=document.getElementById('simklBack');"
+                       + "if(a){a.href=location.pathname.replace(/\\/Simkl\\/Link\\/?$/i,'')+'/web/';}})();</script>"
                        + "\n</body>\n</html>";
 
             return Content(page, "text/html; charset=utf-8");
         }
 
         /// <summary>
-        /// Serves the same page as a bare fragment, for hosts that inject it into
-        /// an existing document (the optional Plugin Pages integration).
+        /// Serves the same page as a bare fragment, for hosts that embed it in a
+        /// document of their own.
         /// </summary>
         /// <returns>The self-service HTML fragment.</returns>
         [HttpGet("Link/Fragment")]
@@ -115,6 +121,31 @@ namespace Jellyfin.Plugin.Simkl.API
             return fragment == null
                 ? NotFound()
                 : Content(fragment, "text/html; charset=utf-8");
+        }
+
+        /// <summary>
+        /// Serves the script that adds the plugin's entry to the user menu of the
+        /// web client.
+        /// </summary>
+        /// <remarks>
+        /// Anonymous on purpose: index.html loads it before anyone is signed in.
+        /// It contains nothing but a link to the self-service page.
+        /// </remarks>
+        /// <returns>The script.</returns>
+        [HttpGet("Client/menu.js")]
+        [AllowAnonymous]
+        public ActionResult GetMenuScript()
+        {
+            var script = ReadResource("Jellyfin.Plugin.Simkl.Client.menu.js");
+            if (script == null)
+            {
+                return NotFound();
+            }
+
+            // index.html asks for it with the plugin version as a query string,
+            // so a day of caching never serves a stale copy after an update.
+            Response.Headers.CacheControl = "public, max-age=86400";
+            return Content(script, "text/javascript; charset=utf-8");
         }
 
         /// <summary>
@@ -448,8 +479,12 @@ namespace Jellyfin.Plugin.Simkl.API
         /// </summary>
         private static string? ReadFragment()
         {
-            var stream = typeof(SelfServiceEndpoints).Assembly
-                .GetManifestResourceStream("Jellyfin.Plugin.Simkl.Configuration.linkPage.html");
+            return ReadResource("Jellyfin.Plugin.Simkl.Configuration.linkPage.html");
+        }
+
+        private static string? ReadResource(string name)
+        {
+            var stream = typeof(SelfServiceEndpoints).Assembly.GetManifestResourceStream(name);
             if (stream == null)
             {
                 return null;
