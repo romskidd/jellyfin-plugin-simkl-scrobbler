@@ -19,11 +19,11 @@ The official [Simkl plugin](https://github.com/jellyfin/jellyfin-plugin-simkl) i
 maintained and scrobbles in real time since its version 9. This fork exists for what it
 does not cover:
 
-- **Every user links their own Simkl account.** Each Jellyfin profile has its own login
-  and settings, and a user without dashboard access can link themselves from a
-  self-service page. *(Requested upstream in
-  [#67](https://github.com/jellyfin/jellyfin-plugin-simkl/issues/67) and
-  [#27](https://github.com/jellyfin/jellyfin-plugin-simkl/issues/27).)*
+- **Users link their own Simkl account themselves.** The official plugin already keeps a
+  separate Simkl login per Jellyfin profile, but only an administrator can set each one up
+  from the dashboard. Here a user without dashboard access opens a self-service page and
+  links their own account, with their own settings — you never have to hand out
+  administrator rights to a friend.
 - **The history syncs both ways.** Bring a Simkl history into a fresh Jellyfin library,
   send what Jellyfin already knows to Simkl, or keep the two aligned from then on — with
   a preview before every write and a 7-day undo. *(Requested upstream in
