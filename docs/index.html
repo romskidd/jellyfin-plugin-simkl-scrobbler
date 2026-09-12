@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RK Simkl Scrobbler — real-time Simkl scrobbling for Jellyfin</title>
+    <meta name="description" content="A Jellyfin plugin that scrobbles to Simkl in real time. Every user links their own Simkl account, and the watch history can be synced both ways. Runs on Jellyfin 10.11 and 12.">
+    <link rel="icon" href="logo.png">
+
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="RK Simkl Scrobbler for Jellyfin">
+    <meta property="og:description" content="Real-time Simkl scrobbling. Every user links their own Simkl account, with optional two-way history sync. Runs on Jellyfin 10.11 and 12.">
+    <meta property="og:image" content="https://romskidd.github.io/jellyfin-plugin-simkl-scrobbler/banner.png">
+    <meta property="og:url" content="https://romskidd.github.io/jellyfin-plugin-simkl-scrobbler/">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://romskidd.github.io/jellyfin-plugin-simkl-scrobbler/banner.png">
+
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #101214;
+            --bg-soft: #16191c;
+            --card: #1b1f23;
+            --text: #e9ecef;
+            --muted: #99a1a9;
+            --dim: #6c757d;
+            --accent: #ff9d00;
+            --border: #282d33;
+            --jf: #00a4dc;
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        a { color: var(--accent); }
+        .wrap { max-width: 980px; margin: 0 auto; padding: 0 22px; }
+        h1, h2, h3 { line-height: 1.2; letter-spacing: -0.01em; }
+
+        /* ---------- hero ---------- */
+        header {
+            border-top: 6px solid var(--accent);
+            background:
+                radial-gradient(1100px 420px at 18% -10%, #23282d 0%, transparent 70%),
+                var(--bg-soft);
+            border-bottom: 1px solid var(--border);
+            padding: 54px 0 48px;
+        }
+        .hero { display: flex; gap: 34px; align-items: center; flex-wrap: wrap; }
+        .hero img.mark { width: 128px; height: 128px; border-radius: 26px; flex: none; }
+        .hero-text { flex: 1 1 420px; min-width: 280px; }
+        .hero h1 { margin: 0 0 10px; font-size: clamp(28px, 5vw, 42px); }
+        .hero p.lead { margin: 0 0 6px; color: var(--accent); font-weight: 600; font-size: clamp(16px, 2.4vw, 19px); }
+        .hero p.sub { margin: 14px 0 0; color: var(--muted); max-width: 60ch; }
+        .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 20px; }
+        .badge {
+            font-size: 12.5px; font-weight: 600; letter-spacing: 0.02em;
+            padding: 5px 11px; border-radius: 999px;
+            border: 1px solid var(--border); background: #12151800; color: var(--muted);
+        }
+        .badge.jf { color: var(--jf); border-color: #0e3c4e; background: #0b2632; }
+        .badge.free { color: #4ade80; border-color: #1b4332; background: #0d2519; }
+
+        .cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 26px; }
+        .btn {
+            display: inline-block; text-decoration: none; font-weight: 650; font-size: 15px;
+            padding: 12px 20px; border-radius: 10px; border: 1px solid transparent;
+        }
+        .btn-primary { background: var(--accent); color: #17191a; }
+        .btn-primary:hover { background: #ffb03a; }
+        .btn-ghost { border-color: var(--border); color: var(--text); background: #1a1e22; }
+        .btn-ghost:hover { border-color: #3a4149; }
+
+        /* ---------- sections ---------- */
+        section { padding: 58px 0; border-bottom: 1px solid var(--border); }
+        section h2 { font-size: clamp(22px, 3.4vw, 28px); margin: 0 0 10px; }
+        section > .wrap > p.intro { color: var(--muted); margin: 0 0 30px; max-width: 66ch; }
+
+        .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
+        .card {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 14px; padding: 22px 22px 20px;
+        }
+        .card h3 { margin: 0 0 8px; font-size: 17px; }
+        .card p { margin: 0; color: var(--muted); font-size: 15px; }
+        .card .tag { display: block; font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; font-weight: 700; }
+
+        /* ---------- steps ---------- */
+        ol.steps { list-style: none; counter-reset: s; margin: 0; padding: 0; display: grid; gap: 14px; }
+        ol.steps li {
+            counter-increment: s; position: relative;
+            background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+            padding: 20px 22px 18px 68px;
+        }
+        ol.steps li::before {
+            content: counter(s);
+            position: absolute; left: 20px; top: 18px;
+            width: 32px; height: 32px; border-radius: 50%;
+            background: rgba(255, 157, 0, .12); border: 1px solid #4a3714;
+            color: var(--accent); font-weight: 700;
+            display: grid; place-items: center;
+        }
+        ol.steps strong { display: block; margin-bottom: 4px; }
+        ol.steps span { color: var(--muted); font-size: 15px; }
+
+        /* ---------- install ---------- */
+        .repo-url {
+            display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+            background: #0c0e10; border: 1px solid var(--border); border-radius: 10px;
+            padding: 12px 14px; margin: 16px 0 8px;
+        }
+        .repo-url code {
+            font: 13.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            color: #cfd6dd; word-break: break-all; flex: 1 1 340px;
+        }
+        .repo-url button {
+            font: inherit; font-size: 13px; font-weight: 600;
+            padding: 7px 13px; border-radius: 7px; cursor: pointer;
+            background: #22272c; color: var(--text); border: 1px solid var(--border);
+        }
+        .repo-url button:hover { border-color: #454d56; }
+        .note { color: var(--dim); font-size: 14px; }
+
+        table.cmp { width: 100%; border-collapse: collapse; font-size: 15px; }
+        table.cmp th, table.cmp td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+        table.cmp th { color: var(--dim); font-size: 12.5px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 700; }
+        table.cmp td.yes { color: #4ade80; }
+        table.cmp td.no { color: var(--dim); }
+        .scroll-x { overflow-x: auto; }
+
+        footer { padding: 40px 0 56px; color: var(--dim); font-size: 14px; }
+        footer p { margin: 0 0 10px; max-width: 70ch; }
+        footer a { color: var(--muted); }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="wrap hero">
+        <img class="mark" src="logo.png" alt="RK Simkl Scrobbler logo">
+        <div class="hero-text">
+            <p class="lead">Real-time Simkl scrobbling for Jellyfin</p>
+            <h1>RK Simkl Scrobbler</h1>
+            <p class="sub">
+                What you watch appears in your Simkl <em>Watching now</em> banner as playback
+                starts, and is marked watched when you stop. Every user on the server links
+                their own Simkl account — and an existing Simkl history can be brought into a
+                Jellyfin library, or sent the other way.
+            </p>
+            <div class="badges">
+                <span class="badge jf">Jellyfin 10.11.x &amp; 12.0</span>
+                <span class="badge free">Free &amp; open source, GPL-3.0</span>
+                <span class="badge">Works with a free Simkl account</span>
+            </div>
+            <div class="cta">
+                <a class="btn btn-primary" href="#install">How to install</a>
+                <a class="btn btn-ghost" href="https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler">Source on GitHub</a>
+            </div>
+        </div>
+    </div>
+</header>
+
+<section>
+    <div class="wrap">
+        <h2>What it does</h2>
+        <p class="intro">
+            Scrobbling means your watch activity is reported as it happens, so Simkl always
+            reflects where you are without you touching anything.
+        </p>
+        <div class="grid">
+            <div class="card">
+                <span class="tag">As you watch</span>
+                <h3>Live scrobbling</h3>
+                <p>
+                    Start, pause and stop are reported the moment they happen, so the title
+                    shows in your Simkl <em>Watching now</em> banner and your paused position
+                    follows you across Simkl-connected devices. Nothing runs on a timer.
+                </p>
+            </div>
+            <div class="card">
+                <span class="tag">For every profile</span>
+                <h3>One Simkl account per user</h3>
+                <p>
+                    Each Jellyfin profile has its own Simkl login and its own settings. A user
+                    without dashboard access can link themselves from a self-service page, so
+                    you never have to hand out administrator rights to a friend.
+                </p>
+            </div>
+            <div class="card">
+                <span class="tag">Both directions</span>
+                <h3>History sync</h3>
+                <p>
+                    Already have years of Simkl history, or a library full of watched episodes
+                    Simkl never saw? The two can be reconciled either way, with the original
+                    watch dates and play counts kept.
+                </p>
+            </div>
+            <div class="card">
+                <span class="tag">Beyond the basics</span>
+                <h3>Rewatches and exclusions</h3>
+                <p>
+                    Finishing something again is filed by Simkl as a rewatch session (Simkl Pro
+                    or VIP, since that is where Simkl offers them). Libraries you would rather
+                    keep private can be left out, per user.
+                </p>
+            </div>
+            <div class="card">
+                <span class="tag">When it goes wrong</span>
+                <h3>A report you can paste</h3>
+                <p>
+                    A Logs tab builds a diagnostic report — versions, a settings summary, the
+                    recent log lines — with no tokens in it, ready for a bug report.
+                </p>
+            </div>
+            <div class="card">
+                <span class="tag">Matching</span>
+                <h3>Titles Simkl can't place</h3>
+                <p>
+                    Items Simkl cannot match by IMDb, TMDb or TVDB id are matched by filename
+                    instead, and anything still unmatched is counted and retried after the next
+                    library scan.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section>
+    <div class="wrap">
+        <h2>The history sync, in three steps</h2>
+        <p class="intro">
+            Off by default, and set up from a single tab. Each step previews what it would
+            change before writing anything, and the first two can be undone for seven days.
+            Import and export also work on their own — you are not obliged to turn on the
+            continuous sync.
+        </p>
+        <ol class="steps">
+            <li>
+                <strong>Simkl to Jellyfin</strong>
+                <span>
+                    Marks as played, in Jellyfin, what your Simkl history already lists —
+                    original watch dates and play counts included, and only for items that
+                    exist in your libraries.
+                </span>
+            </li>
+            <li>
+                <strong>Jellyfin to Simkl</strong>
+                <span>
+                    Sends what Jellyfin has as played and Simkl does not know yet. It reads
+                    your Simkl history first, so it never overwrites a date Simkl already has.
+                </span>
+            </li>
+            <li>
+                <strong>Turn on sync</strong>
+                <span>
+                    From then on, both sides stay aligned after each playback and each library
+                    scan, at most once an hour. A pass that would change more than 200 items
+                    waits for your confirmation.
+                </span>
+            </li>
+        </ol>
+    </div>
+</section>
+
+<section id="install">
+    <div class="wrap">
+        <h2>Installing it</h2>
+        <p class="intro">Two minutes, from the Jellyfin dashboard. No command line.</p>
+        <ol class="steps">
+            <li>
+                <strong>Add the repository</strong>
+                <span>In Jellyfin, go to <em>Dashboard → Plugins → Repositories → Add</em>, give it any name, and paste this URL:</span>
+                <div class="repo-url">
+                    <code id="repoUrl">https://raw.githubusercontent.com/romskidd/jellyfin-plugin-simkl-scrobbler/master/manifest.json</code>
+                    <button type="button" id="copyBtn">Copy</button>
+                </div>
+            </li>
+            <li>
+                <strong>Install the plugin</strong>
+                <span>Open the <em>Catalog</em> tab, find <em>RK Simkl Scrobbler</em>, install it, then restart Jellyfin.</span>
+            </li>
+            <li>
+                <strong>Link your Simkl account</strong>
+                <span>
+                    Open the plugin from the dashboard sidebar, click <em>Log In</em>, and enter
+                    the code shown at <a href="https://simkl.com/pin">simkl.com/pin</a>. The page
+                    updates on its own once Simkl accepts it. Other users of the server can link
+                    themselves from the self-service page whose link you will find on that same page.
+                </span>
+            </li>
+        </ol>
+        <p class="note">
+            A free Simkl account is enough. Rewatch tracking needs Simkl Pro or VIP, because that
+            is the only place Simkl offers it.
+        </p>
+    </div>
+</section>
+
+<section>
+    <div class="wrap">
+        <h2>How it differs from the official Simkl plugin</h2>
+        <p class="intro">
+            This started as a fork of the
+            <a href="https://github.com/jellyfin/jellyfin-plugin-simkl">official Simkl plugin</a>,
+            which is still maintained and added live scrobbling of its own in version 9. It is not
+            a replacement for it — it exists for the parts it does not cover.
+        </p>
+        <div class="scroll-x">
+            <table class="cmp">
+                <thead>
+                    <tr><th>&nbsp;</th><th>RK Simkl Scrobbler</th><th>Official plugin</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Real-time scrobbling</td>
+                        <td class="yes">Yes</td>
+                        <td class="yes">Yes, since version 9</td>
+                    </tr>
+                    <tr>
+                        <td>A Simkl account per Jellyfin user</td>
+                        <td class="yes">Yes</td>
+                        <td class="no">Open request</td>
+                    </tr>
+                    <tr>
+                        <td>Self-service linking for non-admin users</td>
+                        <td class="yes">Yes</td>
+                        <td class="no">—</td>
+                    </tr>
+                    <tr>
+                        <td>Import a Simkl history into Jellyfin</td>
+                        <td class="yes">Yes</td>
+                        <td class="no">Open request</td>
+                    </tr>
+                    <tr>
+                        <td>Send Jellyfin history to Simkl</td>
+                        <td class="yes">Yes</td>
+                        <td class="no">—</td>
+                    </tr>
+                    <tr>
+                        <td>Rewatch sessions</td>
+                        <td class="yes">Yes, Simkl Pro or VIP</td>
+                        <td class="no">—</td>
+                    </tr>
+                    <tr>
+                        <td>Jellyfin versions</td>
+                        <td class="yes">10.11.x and 12.0</td>
+                        <td class="no">Version 9 targets 12.0 only</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<section>
+    <div class="wrap">
+        <h2>Your data</h2>
+        <p class="intro" style="margin-bottom:0">
+            The plugin talks to Simkl and to nothing else. Your Simkl token stays on your own
+            server, in the plugin configuration, and never appears in the logs or in the
+            diagnostic report. Requests are paced to stay within Simkl's published limits.
+            Uninstalling the plugin, or logging out from its page, removes the link.
+        </p>
+    </div>
+</section>
+
+<footer>
+    <div class="wrap">
+        <p>
+            <strong>Unofficial plugin</strong>, not affiliated with or endorsed by Simkl or
+            Jellyfin. Simkl and Jellyfin are trademarks of their respective owners; this is an
+            independent community project, built on top of the official plugin and released under
+            the GPL-3.0.
+        </p>
+        <p>
+            <a href="https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler">Source and issues</a>
+            &nbsp;·&nbsp;
+            <a href="https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/releases">Releases</a>
+            &nbsp;·&nbsp;
+            <a href="https://simkl.com">Simkl</a>
+            &nbsp;·&nbsp;
+            <a href="https://jellyfin.org">Jellyfin</a>
+        </p>
+    </div>
+</footer>
+
+<script>
+    document.getElementById('copyBtn').addEventListener('click', function () {
+        var btn = this;
+        var url = document.getElementById('repoUrl').textContent.trim();
+        var done = function () {
+            btn.textContent = 'Copied';
+            setTimeout(function () { btn.textContent = 'Copy'; }, 1800);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(done, function () { btn.textContent = 'Copy failed'; });
+        } else {
+            // older browsers: fall back to a hidden selection
+            var ta = document.createElement('textarea');
+            ta.value = url;
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); done(); } catch (e) { btn.textContent = 'Copy failed'; }
+            document.body.removeChild(ta);
+        }
+    });
+</script>
+
+</body>
+</html>
