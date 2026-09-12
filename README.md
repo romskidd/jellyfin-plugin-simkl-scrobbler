@@ -1,10 +1,9 @@
-<p align="center"><img src="docs/logo.png" alt="RK Simkl Scrobbler logo" width="160"></p>
-<h1 align="center">RK Simkl Scrobbler for Jellyfin</h1>
-<h3 align="center">Real-time Simkl scrobbling for your Jellyfin server</h3>
+<p align="center"><img src="assets/banner-1280x640.png" alt="RK Simkl Scrobbler — real-time Simkl scrobbling for Jellyfin" width="820"></p>
 <p align="center">
   <a href="https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/romskidd/jellyfin-plugin-simkl-scrobbler?label=release"></a>
   <a href="https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/romskidd/jellyfin-plugin-simkl-scrobbler/total"></a>
-  <img alt="Jellyfin 10.11" src="https://img.shields.io/badge/Jellyfin-10.11.x-00A4DC">
+  <img alt="Jellyfin 10.11 and 12" src="https://img.shields.io/badge/Jellyfin-10.11.x%20%26%2012.0-00A4DC">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-blue"></a>
 </p>
 <p align="center"><em>Unofficial plugin, not affiliated with or endorsed by Simkl or Jellyfin. Simkl and Jellyfin are trademarks of their respective owners; this is an independent community project.</em></p>
 
@@ -13,6 +12,27 @@ title appears in your "Watching now" banner the moment playback starts, pauses a
 tracked, and the item is marked watched once you stop past 80%. Manual check marks,
 rewatches and per-user settings are covered too. Each Jellyfin user links their own
 Simkl account.
+
+## Why this one
+
+The official [Simkl plugin](https://github.com/jellyfin/jellyfin-plugin-simkl) is
+maintained and scrobbles in real time since its version 9. This fork exists for what it
+does not cover:
+
+- **Every user links their own Simkl account.** Each Jellyfin profile has its own login
+  and settings, and a user without dashboard access can link themselves from a
+  self-service page. *(Requested upstream in
+  [#67](https://github.com/jellyfin/jellyfin-plugin-simkl/issues/67) and
+  [#27](https://github.com/jellyfin/jellyfin-plugin-simkl/issues/27).)*
+- **The history syncs both ways.** Bring a Simkl history into a fresh Jellyfin library,
+  send what Jellyfin already knows to Simkl, or keep the two aligned from then on — with
+  a preview before every write and a 7-day undo. *(Requested upstream in
+  [#22](https://github.com/jellyfin/jellyfin-plugin-simkl/issues/22) and
+  [#31](https://github.com/jellyfin/jellyfin-plugin-simkl/issues/31).)*
+- **It runs on Jellyfin 10.11.x and on 12.0.** The official version 9 targets 12.0 only.
+
+Plus rewatch sessions, per-user library exclusions, and a Logs tab that builds a
+diagnostic report with no tokens in it.
 
 ## Installation
 
@@ -32,8 +52,8 @@ Jellyfin then offers the newest version of the two):
 https://raw.githubusercontent.com/romskidd/jellyfin-plugin-simkl-scrobbler/master/manifest-beta.json
 ```
 
-Current beta: **9.6.1.0 Beta 3** with the two-way Simkl sync, see the
-[version history](#version-history).
+The beta channel currently carries the same build as the stable one; it is where the
+next round of changes will appear first.
 
 Runs on Jellyfin 10.11.x and on Jellyfin 12. A free Simkl account is enough; rewatch tracking needs
 Simkl Pro or VIP, as Simkl only offers it there.
@@ -68,7 +88,7 @@ Each profile keeps its own Simkl login and settings.
   the item played in that session, so resuming near the end never counts; Simkl
   applies its own rules on top (item already watched, two days between viewings)
 
-**Simkl sync** (beta, off by default)
+**Simkl sync** (off by default)
 - Set up in three steps from the **Import / Export & sync** tab, guided by a status box (each button unlocks after the previous one): **1. Simkl to Jellyfin** marks
   as played what your Simkl history lists (watch date and play count included, only
   items present in your libraries), **2. Jellyfin to Simkl** sends what Jellyfin has
@@ -103,10 +123,11 @@ Each profile keeps its own Simkl login and settings.
 ## Upgrade notes
 
 > [!NOTE]
-> **9.6.1.0 Beta 3** is a beta: the Simkl sync is new and marked experimental. It is off
-> until you set it up, and the scrobbling side is unchanged. Please report anything odd
-> in the [issues](https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/issues),
-> with the report from the new **Logs** tab.
+> **9.7.0.0** brings the Simkl sync to the stable channel, and one build now covers both
+> Jellyfin 10.11.x and Jellyfin 12. The sync stays off until you set it up, and the
+> scrobbling side is unchanged. Please report anything odd in the
+> [issues](https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/issues), with the
+> report from the **Logs** tab.
 
 > [!IMPORTANT]
 > **Coming from 9.3.0.0 or earlier?** Since 9.4.0.0 the plugin runs as its own Simkl
@@ -158,9 +179,12 @@ team's feedback.
 ## About
 
 This project started as a fork of the official
-[jellyfin-plugin-simkl](https://github.com/jellyfin/jellyfin-plugin-simkl), which only
-marks items watched after playback. Real-time scrobbling was added on top, and since
-9.1.0.0 the plugin is independent, with its own plugin id, maintained by
+[jellyfin-plugin-simkl](https://github.com/jellyfin/jellyfin-plugin-simkl), at a time
+when it marked items watched only after playback. Real-time scrobbling was added on top,
+then per-user accounts and the two-way sync. The official plugin is still maintained and
+has since added live scrobbling of its own; this fork is not a replacement for it, and
+the scrobbling core still owes it a lot. Since 9.1.0.0 this plugin is independent, with
+its own plugin id, maintained by
 [romskidd](https://github.com/romskidd). Thanks to the Simkl team for their API and
 their review. Feedback, bug reports and ideas are welcome in the
 [issues](https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/issues).
@@ -169,6 +193,7 @@ their review. Feedback, bug reports and ideas are welcome in the
 
 | Version | Date | Changes |
 |---|---|---|
+| **9.7.0.0** | 2026-09-12 | First stable release with the **two-way Simkl sync** (three steps from the *Import / Export & sync* tab, guided by a status box; import and export also work on their own; preview before every write, a click on any result number lists the titles, 7-day undo both ways, confirmation above 200 changes, excluded libraries untouched, anime not covered). One build now runs on **Jellyfin 10.11.x and 12** — the self-service page authenticates the way 12 requires, and every path was checked on a 12.0 server. **Logs** tab with a diagnostic report carrying no tokens. The plugin has a **logo**. Watches kept while a link is expired, unmatched items retried after a scan, server-wide request pacing. Both settings pages redesigned, the self-service one matching the admin one. |
 | **9.6.1.0** (Beta 3) | 2026-09-08 | Runs on **Jellyfin 12** as well as 10.11: the self-service page authenticates the way 12 requires, and every other path was checked on a 12.0 server. The plugin has a **logo** (RK monogram cut through by the scrobble pulse), shown in the catalogue and on both settings pages. A **click on any result number** opens the list of the items behind it. |
 | **9.6.0.0** (Beta 2) | 2026-09-07 | **Simkl sync** (experimental, beta channel): three-step setup, 1. Simkl to Jellyfin, 2. Jellyfin to Simkl, 3. Keep in sync (after each playback and library scan, at most hourly). Preview before every write, 7-day undo both ways, confirmation above 200 changes, excluded libraries untouched, anime not covered, unmatched items retried after each scan, per linked profile. Finished watches kept while a link is expired (30 days). **Logs** tab with a diagnostic report. Settings pages redesigned (users' link, profile, then tabs) and wider, self-service page styled like the admin page. Simkl reads paced like writes, plus server-wide pacing. Beta 2 (2026-09-07): sync state tied to the Simkl account (relinking another account starts over); step 2 skips what Simkl already has, never moves watch dates, its undo only removes what it added; admin saves keep the server's account and sync fields; rejected logins detected on every call, refused history writes not counted as sent; self-service library list limited to what the user may see. Tab renamed Import / Export & sync with a guided status box (Preview import > Import > Preview export > Export > Turn on sync, result counters, animated when the sync is on, ? help) and independent Import / Export cards; step 3 is an immediate Turn on / Turn off sync button, Manual resync while on. |
 | **9.5.0.0** | 2026-09-03 | Renamed **RK Simkl Scrobbler** at Simkl's request (unofficial plugin, not affiliated with or endorsed by Simkl or Jellyfin); plugin id unchanged. Rewatches are now filed by Simkl directly on the scrobble stop (Pro/VIP): no more watched lookup at playback start, no separate history write, same safeguards. Settings and statistics re-read only when Simkl's activity feed changes; PIN status polled at Simkl's interval. Identifies as rk-simkl-scrobbler. |
