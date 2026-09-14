@@ -266,6 +266,7 @@ namespace Jellyfin.Plugin.Simkl.Services
                     Title = entry.Title,
                     Year = entry.Year,
                     Ids = new SimklShowIds(entry.ProviderIds),
+                    UseTvdbAnimeSeasons = true,
                     Seasons = new[]
                     {
                         new Season

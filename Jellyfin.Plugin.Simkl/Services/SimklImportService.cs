@@ -481,15 +481,19 @@ namespace Jellyfin.Plugin.Simkl.Services
 
                 var readShows = true;
                 var readMovies = true;
+                var readAnime = true;
                 string? showsFrom = null;
                 string? moviesFrom = null;
+                string? animeFrom = null;
                 if (mode == ImportMode.Delta)
                 {
                     readShows = activity.ShowsStamp != null && !string.Equals(activity.ShowsStamp, config.ImportShowsStamp, StringComparison.Ordinal);
                     readMovies = activity.MoviesStamp != null && !string.Equals(activity.MoviesStamp, config.ImportMoviesStamp, StringComparison.Ordinal);
+                    readAnime = activity.AnimeStamp != null && !string.Equals(activity.AnimeStamp, config.ImportAnimeStamp, StringComparison.Ordinal);
                     showsFrom = config.ImportShowsStamp;
                     moviesFrom = config.ImportMoviesStamp;
-                    if (!readShows && !readMovies)
+                    animeFrom = config.ImportAnimeStamp;
+                    if (!readShows && !readMovies && !readAnime)
                     {
                         SimklPlugin.Instance?.SaveConfiguration();
                         report.Message = "Nothing changed on Simkl since the last pass.";
@@ -520,6 +524,24 @@ namespace Jellyfin.Plugin.Simkl.Services
                     }
 
                     PlanMovies(user, config, body, plan);
+                }
+
+                // Anime is its own list on Simkl. A failure there is not worth
+                // dropping the shows and movies already read: the pass goes on,
+                // and the anime stamp stays put so the next pass reads it again.
+                var animeRead = false;
+                if (readAnime)
+                {
+                    var body = await _simklApi.GetAllItemsRawAsync(config.UserToken, "anime", animeFrom).ConfigureAwait(false);
+                    if (body == null)
+                    {
+                        _logger.LogWarning("Simkl did not return the anime history; this pass leaves anime out");
+                    }
+                    else
+                    {
+                        PlanShows(user, config, body, plan, "anime");
+                        animeRead = true;
+                    }
                 }
 
                 // Unwatch only makes sense against the full list: a delta can't
@@ -618,6 +640,11 @@ namespace Jellyfin.Plugin.Simkl.Services
                     config.ImportMoviesStamp = activity.MoviesStamp;
                 }
 
+                if (activity.AnimeStamp != null && animeRead)
+                {
+                    config.ImportAnimeStamp = activity.AnimeStamp;
+                }
+
                 if (mode == ImportMode.Initial)
                 {
                     config.ImportInitialDone = true;
@@ -650,18 +677,32 @@ namespace Jellyfin.Plugin.Simkl.Services
             }
         }
 
-        private void PlanShows(JellyfinUser user, UserConfig config, string body, ImportPlan plan)
+        private void PlanShows(JellyfinUser user, UserConfig config, string body, ImportPlan plan, string listKey = "shows")
         {
             using var document = JsonDocument.Parse(body);
-            if (!document.RootElement.TryGetProperty("shows", out var shows) || shows.ValueKind != JsonValueKind.Array)
+            if (document.RootElement.ValueKind != JsonValueKind.Object
+                || !document.RootElement.TryGetProperty(listKey, out var shows)
+                || shows.ValueKind != JsonValueKind.Array)
             {
                 return;
             }
 
             foreach (var entry in shows.EnumerateArray())
             {
-                if (!entry.TryGetProperty("show", out var show) || !entry.TryGetProperty("seasons", out var seasons) || seasons.ValueKind != JsonValueKind.Array)
+                if (!entry.TryGetProperty("show", out var show))
                 {
+                    continue;
+                }
+
+                if (!entry.TryGetProperty("seasons", out var seasons) || seasons.ValueKind != JsonValueKind.Array)
+                {
+                    // Anime films and specials sit in Simkl's anime list without
+                    // seasons; in Jellyfin they are movies.
+                    if (listKey == "anime")
+                    {
+                        PlanAnimeFilm(user, config, entry, show, plan);
+                    }
+
                     continue;
                 }
 
@@ -672,7 +713,7 @@ namespace Jellyfin.Plugin.Simkl.Services
 
                 foreach (var season in seasons.EnumerateArray())
                 {
-                    if (!season.TryGetProperty("number", out var sn) || !sn.TryGetInt32(out var seasonNumber) || seasonNumber <= 0)
+                    if (!season.TryGetProperty("number", out var sn) || !sn.TryGetInt32(out var simklSeason) || simklSeason <= 0)
                     {
                         continue;
                     }
@@ -684,9 +725,21 @@ namespace Jellyfin.Plugin.Simkl.Services
 
                     foreach (var ep in eps.EnumerateArray())
                     {
-                        if (!ep.TryGetProperty("number", out var en) || !en.TryGetInt32(out var episodeNumber))
+                        if (!ep.TryGetProperty("number", out var en) || !en.TryGetInt32(out var simklEpisode))
                         {
                             continue;
+                        }
+
+                        // Anime episodes carry their TVDB season and episode, the
+                        // numbering Jellyfin libraries use; shows have none.
+                        var seasonNumber = simklSeason;
+                        var episodeNumber = simklEpisode;
+                        if (ep.TryGetProperty("tvdb", out var tvdb) && tvdb.ValueKind == JsonValueKind.Object
+                            && tvdb.TryGetProperty("season", out var ts) && ts.TryGetInt32(out var tvdbSeason) && tvdbSeason > 0
+                            && tvdb.TryGetProperty("episode", out var te) && te.TryGetInt32(out var tvdbEpisode) && tvdbEpisode > 0)
+                        {
+                            seasonNumber = tvdbSeason;
+                            episodeNumber = tvdbEpisode;
                         }
 
                         var watchedAt = ReadDate(ep, "watched_at") ?? ReadDate(entry, "last_watched_at");
@@ -736,10 +789,63 @@ namespace Jellyfin.Plugin.Simkl.Services
             }
         }
 
+        // An anime film or special from Simkl's anime list, matched as a Jellyfin
+        // movie. Specials that are episodes in Jellyfin simply don't match.
+        private void PlanAnimeFilm(JellyfinUser user, UserConfig config, JsonElement entry, JsonElement show, ImportPlan plan)
+        {
+            var status = entry.TryGetProperty("status", out var st) && st.ValueKind == JsonValueKind.String ? st.GetString() : null;
+            if (!string.Equals(status, "completed", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var type = entry.TryGetProperty("anime_type", out var at) && at.ValueKind == JsonValueKind.String ? at.GetString() : null;
+            var title = ReadTitle(show);
+            var ids = ReadIds(show, _movieIdKeys);
+            var watchedAt = ReadDate(entry, "last_watched_at");
+            var item = ids.Count == 0 ? null : FindItem(user, BaseItemKind.Movie, ids);
+            if (item == null)
+            {
+                // Only a film is expected to be a movie here; an unmatched special
+                // is most likely an episode somewhere and not worth reporting.
+                if (string.Equals(type, "movie", StringComparison.OrdinalIgnoreCase))
+                {
+                    plan.UnmatchedMovies++;
+                    plan.Unmatched.Add(new UnmatchedEntry { Type = "movie", Title = title, Ids = ids, WatchedAt = watchedAt });
+                }
+
+                return;
+            }
+
+            plan.Present.Add(item.Id);
+            if (!config.ScrobbleMovies || _libraryFilter.IsExcluded(config, item.Path))
+            {
+                plan.Excluded++;
+                return;
+            }
+
+            if (_userDataManager.GetUserData(user, item)?.Played == true)
+            {
+                plan.AlreadyPlayed++;
+                return;
+            }
+
+            plan.Changes.Add(new PlannedChange
+            {
+                Item = item,
+                Line = ItemLine(title, null, null, watchedAt),
+                WatchedAt = watchedAt,
+                Play = true,
+                IsMovie = true,
+            });
+        }
+
         private void PlanMovies(JellyfinUser user, UserConfig config, string body, ImportPlan plan)
         {
             using var document = JsonDocument.Parse(body);
-            if (!document.RootElement.TryGetProperty("movies", out var movies) || movies.ValueKind != JsonValueKind.Array)
+            if (document.RootElement.ValueKind != JsonValueKind.Object
+                || !document.RootElement.TryGetProperty("movies", out var movies)
+                || movies.ValueKind != JsonValueKind.Array)
             {
                 return;
             }
@@ -1374,6 +1480,7 @@ namespace Jellyfin.Plugin.Simkl.Services
                     Year = entry.Series.ProductionYear,
                     Ids = new SimklShowIds(new Dictionary<string, string>(entry.Ids, StringComparer.OrdinalIgnoreCase)),
                     Seasons = seasons,
+                    UseTvdbAnimeSeasons = true,
                 });
                 currentIds.AddRange(entry.ItemIds);
 
@@ -1431,6 +1538,16 @@ namespace Jellyfin.Plugin.Simkl.Services
             }
 
             PlanMovies(user, config, movies, probe);
+
+            // Simkl files anime apart from shows, and moves a scrobbled series
+            // there on its own. Without this list, every anime episode Simkl
+            // already has would be offered for export again.
+            var anime = await _simklApi.GetAllItemsRawAsync(config.UserToken, "anime", null).ConfigureAwait(false);
+            if (anime != null)
+            {
+                PlanShows(user, config, anime, probe, "anime");
+            }
+
             return probe.Present;
         }
 
@@ -1560,6 +1677,7 @@ namespace Jellyfin.Plugin.Simkl.Services
                     Year = entry.Series.ProductionYear,
                     Ids = new SimklShowIds(new Dictionary<string, string>(entry.Ids, StringComparer.OrdinalIgnoreCase)),
                     Seasons = seasons,
+                    UseTvdbAnimeSeasons = true,
                 });
 
                 if (++showsInBatch >= ExportShowsPerRequest)
@@ -1863,6 +1981,7 @@ namespace Jellyfin.Plugin.Simkl.Services
             config.ImportFromSimkl = false;
             config.ImportShowsStamp = null;
             config.ImportMoviesStamp = null;
+            config.ImportAnimeStamp = null;
             config.ImportLastCheckUtc = null;
             config.ExportLastReport = null;
             config.ImportLastReport = "This profile is now linked to another Simkl account: the sync starts over from step 1.";

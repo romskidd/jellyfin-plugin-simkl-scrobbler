@@ -201,6 +201,7 @@ namespace Jellyfin.Plugin.Simkl.API
                     SyncMarkPlayed = config?.SyncMarkPlayed ?? true,
                     SyncMarkUnplayed = config?.SyncMarkUnplayed ?? false,
                     EnableRewatches = config?.EnableRewatches ?? false,
+                    RefreshScrobbleProgress = config?.RefreshScrobbleProgress ?? true,
                     ImportFromSimkl = config?.ImportFromSimkl ?? false,
                     ImportUnwatch = config?.ImportUnwatch ?? false,
                     MinLength = config?.MinLength ?? 5,
@@ -460,6 +461,7 @@ namespace Jellyfin.Plugin.Simkl.API
             config.SyncMarkPlayed = options.SyncMarkPlayed || config.ImportFromSimkl;
             config.SyncMarkUnplayed = options.SyncMarkUnplayed || config.ImportFromSimkl;
             config.EnableRewatches = options.EnableRewatches;
+            config.RefreshScrobbleProgress = options.RefreshScrobbleProgress;
             config.ImportUnwatch = options.ImportUnwatch;
             config.MinLength = Math.Clamp(options.MinLength, 0, 600);
             var known = new HashSet<string>(

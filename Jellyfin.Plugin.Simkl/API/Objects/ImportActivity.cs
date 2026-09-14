@@ -21,5 +21,10 @@ namespace Jellyfin.Plugin.Simkl.API.Objects
         /// Gets or sets the movies.all stamp.
         /// </summary>
         public string? MoviesStamp { get; set; }
+
+        /// <summary>
+        /// Gets or sets the anime.all stamp.
+        /// </summary>
+        public string? AnimeStamp { get; set; }
     }
 }

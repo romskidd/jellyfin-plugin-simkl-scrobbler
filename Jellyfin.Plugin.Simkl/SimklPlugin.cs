@@ -70,6 +70,7 @@ namespace Jellyfin.Plugin.Simkl
                     next.ImportInitialDone = current.ImportInitialDone;
                     next.ImportShowsStamp = current.ImportShowsStamp;
                     next.ImportMoviesStamp = current.ImportMoviesStamp;
+                    next.ImportAnimeStamp = current.ImportAnimeStamp;
                     next.ImportLastCheckUtc = current.ImportLastCheckUtc;
                     next.ImportLastReport = current.ImportLastReport;
                     next.ExportInitialDone = current.ExportInitialDone;

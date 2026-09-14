@@ -727,7 +727,7 @@ namespace Jellyfin.Plugin.Simkl.API
             {
                 // Jellyfin sends episode id instead of show id
                 // TODO: TV Shows scrobbling (WIP)
-                history.Shows.Add(new SimklShow(item));
+                history.Shows.Add(new SimklShow(item) { UseTvdbAnimeSeasons = true });
             }
             else if (item.Type == BaseItemKind.Episode)
             {
@@ -928,6 +928,7 @@ namespace Jellyfin.Plugin.Simkl.API
 
                     snapshot.ShowsStamp = ReadNestedStamp(rootElement, "tv_shows");
                     snapshot.MoviesStamp = ReadNestedStamp(rootElement, "movies");
+                    snapshot.AnimeStamp = ReadNestedStamp(rootElement, "anime");
 
                     if (rootElement.TryGetProperty("settings", out var settings)
                         && settings.ValueKind == JsonValueKind.Object
@@ -972,6 +973,7 @@ namespace Jellyfin.Plugin.Simkl.API
                 Unauthorized = snapshot.Unauthorized,
                 ShowsStamp = snapshot.ShowsStamp,
                 MoviesStamp = snapshot.MoviesStamp,
+                AnimeStamp = snapshot.AnimeStamp,
             };
         }
 
@@ -980,12 +982,15 @@ namespace Jellyfin.Plugin.Simkl.API
         /// or only what changed since a stamp, with per-episode watch dates.
         /// </summary>
         /// <param name="userToken">User token.</param>
-        /// <param name="type">"shows" or "movies".</param>
+        /// <param name="type">"shows", "movies" or "anime".</param>
         /// <param name="dateFrom">An activity stamp to read changes since, or null for everything.</param>
         /// <returns>The raw JSON body, or null when the request failed.</returns>
         public async Task<string?> GetAllItemsRawAsync(string userToken, string type, string? dateFrom)
         {
-            var url = "/sync/all-items/" + type + "?extended=full&episode_watched_at=yes";
+            // For anime, full_anime_seasons adds the TVDB season and episode of
+            // every watched episode: that is how Jellyfin libraries number them.
+            var extended = string.Equals(type, "anime", StringComparison.Ordinal) ? "full_anime_seasons" : "full";
+            var url = "/sync/all-items/" + type + "?extended=" + extended + "&episode_watched_at=yes";
             if (!string.IsNullOrEmpty(dateFrom))
             {
                 url += "&date_from=" + Uri.EscapeDataString(dateFrom);
@@ -1100,6 +1105,8 @@ namespace Jellyfin.Plugin.Simkl.API
             public string? ShowsStamp { get; set; }
 
             public string? MoviesStamp { get; set; }
+
+            public string? AnimeStamp { get; set; }
 
             public DateTime CheckedUtc { get; set; }
         }

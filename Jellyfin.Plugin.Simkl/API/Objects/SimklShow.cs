@@ -67,5 +67,16 @@ namespace Jellyfin.Plugin.Simkl.API.Objects
         [JsonPropertyName("rewatch_id")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public int? RewatchId { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether Simkl reads the season and episode
+        /// numbers as TVDB ones for an anime. Simkl files each anime season as a
+        /// series of its own, while Jellyfin libraries number them like TVDB does;
+        /// without this, a second season sent with the TVDB id lands on the wrong
+        /// entry. Simkl ignores it for anything that is not an anime.
+        /// </summary>
+        [JsonPropertyName("use_tvdb_anime_seasons")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? UseTvdbAnimeSeasons { get; set; }
     }
 }

@@ -295,7 +295,8 @@ namespace Jellyfin.Plugin.Simkl.Services
                     Title = series?.Name,
                     Year = series?.ProductionYear,
                     Ids = new SimklShowIds(new Dictionary<string, string>(seriesIds, StringComparer.OrdinalIgnoreCase)),
-                    Seasons = seasons
+                    Seasons = seasons,
+                    UseTvdbAnimeSeasons = true
                 });
             }
 

@@ -455,6 +455,17 @@
                         </div>
                         <div class="simklOption">
                             <div class="checkboxcontainer"><label>
+                                <input is="emby-checkbox" type="checkbox" id="RefreshScrobbleProgress"/>
+                                <span>Keep the position on Simkl up to date</span>
+                            </label></div>
+                            <div class="fieldDescription">
+                                While playing, the real position is sent again every 5 minutes, and at once
+                                after a skip or when watching faster or slower than normal, so the
+                                "Watching now" banner follows what is actually on screen.
+                            </div>
+                        </div>
+                        <div class="simklOption">
+                            <div class="checkboxcontainer"><label>
                                 <input is="emby-checkbox" type="checkbox" id="ScrobbleMovies"/>
                                 <span>Scrobble Movies</span>
                             </label></div>
@@ -545,7 +556,7 @@
                 <li><strong>Jellyfin to Simkl.</strong> Everything already marked played here is sent to your Simkl history with its dates. Items that came from step 1 are skipped.</li>
                 <li><strong>Keep in sync.</strong> Once both are done, tick the box. From then on, what you watch on Simkl shows up here (checked after a playback or a library scan, at most once an hour), and what you watch here already reaches Simkl in real time.</li>
                             </ol>
-                            <p class="simklMuted">Every step shows a preview first and can be undone for 7 days. Matching uses IMDb/TMDb/TVDB ids only; anime is left out for now. Automatic passes stop at 200 changes until you confirm.</p>
+                            <p class="simklMuted">Every step shows a preview first and can be undone for 7 days. Matching uses IMDb/TMDb/TVDB ids; anime seasons are matched through Simkl's own TVDB season mapping. Automatic passes stop at 200 changes until you confirm.</p>
                             </div>
                             <div class="simklSbTrack">
                                 <div class="simklSbSeg s1" id="simklSbSeg1"><span>1</span>Simkl to Jellyfin</div>

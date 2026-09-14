@@ -22,6 +22,7 @@ namespace Jellyfin.Plugin.Simkl.Configuration
             ScrobbleTimeout = 30;
             SyncMarkPlayed = true;
             SyncMarkUnplayed = false;
+            RefreshScrobbleProgress = true;
             ExcludedLibraries = Array.Empty<string>();
         }
 
@@ -160,6 +161,11 @@ namespace Jellyfin.Plugin.Simkl.Configuration
         public string? ImportMoviesStamp { get; set; }
 
         /// <summary>
+        /// Gets or sets the anime activity stamp the last import pass used.
+        /// </summary>
+        public string? ImportAnimeStamp { get; set; }
+
+        /// <summary>
         /// Gets or sets when Simkl's activity was last checked for the import.
         /// </summary>
         public DateTime? ImportLastCheckUtc { get; set; }
@@ -186,6 +192,15 @@ namespace Jellyfin.Plugin.Simkl.Configuration
         /// this for Pro and VIP accounts.
         /// </summary>
         public bool EnableRewatches { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the position is sent to Simkl
+        /// again during playback: every few minutes, and at once after a skip or
+        /// while playing faster or slower than normal. Simkl moves its "Watching
+        /// now" banner at normal speed from the last event, so without this the
+        /// banner drifts away from what is actually playing.
+        /// </summary>
+        public bool RefreshScrobbleProgress { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether the Simkl token was rejected

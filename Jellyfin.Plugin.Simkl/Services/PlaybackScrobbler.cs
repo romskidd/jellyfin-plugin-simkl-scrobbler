@@ -23,10 +23,11 @@ namespace Jellyfin.Plugin.Simkl.Services
     /// </summary>
     /// <remarks>
     /// Implements the Simkl scrobble lifecycle (<c>start</c> / <c>pause</c> / <c>stop</c>).
-    /// Events are sent only on real player transitions — playback start, pause,
-    /// resume and stop — never on a timer. Simkl extrapolates progress between
-    /// events from the item runtime, so polling would only waste quota and trip
-    /// the 20-second per-user lock. The watched mark is decided server-side: a
+    /// Events follow real player transitions — playback start, pause, resume and
+    /// stop. Simkl extrapolates progress between events at normal speed, so while
+    /// playing the position is also sent again every few minutes, and at once when
+    /// it drifts from that extrapolation (a skip, or a speed other than 1x), unless
+    /// the profile turned that off. Never faster than the 20-second per-user lock. The watched mark is decided server-side: a
     /// <c>stop</c> with progress &gt;= 80 is recorded as watched, anything lower is
     /// kept as a resumable playback.
     /// </remarks>
@@ -44,6 +45,15 @@ namespace Jellyfin.Plugin.Simkl.Services
         // Skip re-sending the same action for the same item within this window
         // to stay clear of the server's 20-second per-user lock.
         private static readonly TimeSpan _minActionInterval = TimeSpan.FromSeconds(20);
+
+        // While playing, the position is sent again this often, so Simkl's banner
+        // never strays far from what is on screen.
+        private static readonly TimeSpan _refreshInterval = TimeSpan.FromMinutes(5);
+
+        // How far the real position may drift from a normal-speed playback since
+        // the last reference point before it is sent at once: a skip, or watching
+        // at 1.25x / 1.5x, gets there quickly; buffering and ticks don't.
+        private static readonly TimeSpan _maxDrift = TimeSpan.FromSeconds(60);
 
         private readonly ISessionManager _sessionManager;
         private readonly ILogger<PlaybackScrobbler> _logger;
@@ -179,11 +189,17 @@ namespace Jellyfin.Plugin.Simkl.Services
                 {
                     await SendScrobble(SimklScrobbleAction.Pause, e, GetProgress(e)).ConfigureAwait(false);
                     state.Paused = true;
+                    MarkReference(state, e);
                 }
                 else if (!paused && state.Paused)
                 {
                     await SendScrobble(SimklScrobbleAction.Start, e, GetProgress(e)).ConfigureAwait(false);
                     state.Paused = false;
+                    MarkReference(state, e);
+                }
+                else if (!paused)
+                {
+                    await RefreshIfDue(state, e).ConfigureAwait(false);
                 }
             }
             catch (Exception ex)
@@ -277,7 +293,9 @@ namespace Jellyfin.Plugin.Simkl.Services
                 ItemId = e.MediaInfo.Id,
                 Paused = e.IsPaused,
                 Ignore = skipReason != null,
-                StartProgress = GetProgress(e)
+                StartProgress = GetProgress(e),
+                ReferenceTicks = e.PlaybackPositionTicks ?? 0,
+                ReferenceUtc = DateTime.UtcNow
             };
             _sessions[session.Id] = state;
 
@@ -295,6 +313,53 @@ namespace Jellyfin.Plugin.Simkl.Services
                 state.LastAction = SimklScrobbleAction.Start;
                 state.LastSent = DateTime.UtcNow;
             }
+        }
+
+        private static void MarkReference(SessionState state, PlaybackProgressEventArgs e)
+        {
+            state.ReferenceTicks = e.PlaybackPositionTicks ?? state.ReferenceTicks;
+            state.ReferenceUtc = DateTime.UtcNow;
+        }
+
+        // Sends the real position again when it is due: after the refresh interval,
+        // or as soon as it drifts from a normal-speed playback. A start replaces
+        // the session on Simkl's side and marks nothing watched.
+        private async Task RefreshIfDue(SessionState state, PlaybackProgressEventArgs e)
+        {
+            var session = e.Session;
+            var position = e.PlaybackPositionTicks;
+            if (session == null || position == null)
+            {
+                return;
+            }
+
+            var userConfig = SimklPlugin.Instance?.Configuration.GetByGuid(session.UserId);
+            if (userConfig == null || !userConfig.RefreshScrobbleProgress)
+            {
+                return;
+            }
+
+            var now = DateTime.UtcNow;
+            var elapsed = now - state.ReferenceUtc;
+            var drift = Math.Abs(position.Value - (state.ReferenceTicks + elapsed.Ticks));
+            if (elapsed < _refreshInterval && drift < _maxDrift.Ticks)
+            {
+                return;
+            }
+
+            if (now - state.LastSent < _minActionInterval)
+            {
+                return;
+            }
+
+            // Move the reference first, so a refused send isn't retried on every tick.
+            state.ReferenceTicks = position.Value;
+            state.ReferenceUtc = now;
+            var why = elapsed >= _refreshInterval
+                ? "interval"
+                : "drift of " + TimeSpan.FromTicks(drift).TotalSeconds.ToString("0", CultureInfo.InvariantCulture) + " s";
+            _logger.LogDebug("Refreshing the position of {Name} ({Why})", e.MediaInfo?.Name, why);
+            await SendScrobble(SimklScrobbleAction.Start, e, GetProgress(e), force: true).ConfigureAwait(false);
         }
 
         private async Task<bool> SendScrobble(SimklScrobbleAction action, PlaybackProgressEventArgs e, double progress, bool force = false)
@@ -702,6 +767,17 @@ namespace Jellyfin.Plugin.Simkl.Services
             /// Gets or sets the UTC time of the last successful scrobble.
             /// </summary>
             public DateTime LastSent { get; set; }
+
+            /// <summary>
+            /// Gets or sets the playback position, in ticks, at the last reference
+            /// point (start, pause, resume or refresh).
+            /// </summary>
+            public long ReferenceTicks { get; set; }
+
+            /// <summary>
+            /// Gets or sets when that reference position was taken.
+            /// </summary>
+            public DateTime ReferenceUtc { get; set; }
         }
     }
 }

@@ -396,6 +396,16 @@
                 </div>
             </div>
             <div class="simkl-opt">
+                <label>
+                    <input type="checkbox" id="simklRefreshScrobbleProgress"/>
+                    <span>Keep the position on Simkl up to date</span>
+                </label>
+                <div class="simkl-hint">
+                    While playing, the real position is sent again every 5 minutes, and at once
+                    after a skip or when watching faster or slower than normal.
+                </div>
+            </div>
+            <div class="simkl-opt">
                 <label><input type="checkbox" id="simklScrobbleMovies"/><span>Scrobble Movies</span></label>
             </div>
             <div class="simkl-opt">
@@ -457,7 +467,7 @@
                 <li><strong>Jellyfin to Simkl.</strong> Everything already marked played here is sent to your Simkl history with its dates. Items that came from step 1 are skipped.</li>
                 <li><strong>Keep in sync.</strong> Once both are done, tick the box. From then on, what you watch on Simkl shows up here (checked after a playback or a library scan, at most once an hour), and what you watch here already reaches Simkl in real time.</li>
                     </ol>
-                    <p class="simkl-muted">Every step shows a preview first and can be undone for 7 days. Matching uses IMDb/TMDb/TVDB ids only; anime is left out for now. Automatic passes stop at 200 changes until you confirm.</p>
+                    <p class="simkl-muted">Every step shows a preview first and can be undone for 7 days. Matching uses IMDb/TMDb/TVDB ids; anime seasons are matched through Simkl's own TVDB season mapping. Automatic passes stop at 200 changes until you confirm.</p>
                     </div>
                     <div class="simkl-sb-track">
                         <div class="simkl-sb-seg s1" id="simklSbSeg1"><span>1</span>Simkl to Jellyfin</div>
@@ -644,7 +654,7 @@
                     .forEach(function (s) { el(s).hidden = (s !== id); });
             }
 
-            var optionKeys = ['EnablePlaybackScrobbling', 'ScrobbleMovies', 'ScrobbleShows',
+            var optionKeys = ['EnablePlaybackScrobbling', 'RefreshScrobbleProgress', 'ScrobbleMovies', 'ScrobbleShows',
                 'SyncMarkPlayed', 'SyncMarkUnplayed', 'EnableRewatches', 'ImportUnwatch'];
 
             var previewDone = { import: false, export: false };

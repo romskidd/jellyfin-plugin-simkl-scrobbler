@@ -90,7 +90,9 @@ Each profile keeps its own Simkl login and settings.
 - Real-time `start` / `pause` / `stop` events, so titles appear in your live
   "Watching now" banner and paused positions follow you across Simkl-connected devices
 - Marked watched when you stop past 80% (decided by Simkl, per its scrobble guide)
-- Events are sent only on real player actions, never on a timer
+- Events follow real player actions; while playing, the position is also sent again
+  every 5 minutes and right after a skip or a speed change, so the banner keeps up
+  (can be turned off per profile)
 - Items that Simkl can't match by IMDb/TMDb/TVDB ids are matched by filename
 
 **Marking and rewatches**
@@ -110,7 +112,8 @@ Each profile keeps its own Simkl login and settings.
   history after each playback and library scan, at most once an hour
 - Every step shows a preview before anything is written; both directions can be
   undone for 7 days; a pass that would change more than 200 items waits for your
-  confirmation; excluded libraries are left alone; anime is not covered
+  confirmation; excluded libraries are left alone; anime is covered, its seasons
+  matched through Simkl's own TVDB season mapping
 - Items Simkl lists that Jellyfin can't match are counted and retried after each
   library scan
 - Each linked profile sets it up on its own page (admin page or self-service page)
