@@ -208,9 +208,9 @@ their review. Feedback, bug reports and ideas are welcome in the
 
 ## What's new
 
+- **9.8.0.0** (2026-09-14) — anime in the Simkl sync (TVDB season mapping); the position on Simkl follows skips and playback speed.
 - **9.7.2.0** (2026-09-14) — no duplicate menu entry when upgrading with Plugin Pages installed; warning against running this plugin and the official one together.
 - **9.7.1.0** (2026-09-12) — an **RK Simkl Scrobbler** entry in every user's menu, with nothing else to install; Settings tab; Plugin Pages integration retired.
-- **9.7.0.0** (2026-09-12) — the two-way Simkl sync reaches the stable channel; one build for Jellyfin 10.11.x and 12; Logs tab; logo.
 
 The full history is in [CHANGELOG.md](CHANGELOG.md), and each release has its own notes on the
 [releases page](https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/releases).

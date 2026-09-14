@@ -53,7 +53,7 @@ namespace Jellyfin.Plugin.Simkl.Services
         // How far the real position may drift from a normal-speed playback since
         // the last reference point before it is sent at once: a skip, or watching
         // at 1.25x / 1.5x, gets there quickly; buffering and ticks don't.
-        private static readonly TimeSpan _maxDrift = TimeSpan.FromSeconds(60);
+        private static readonly TimeSpan _maxDrift = TimeSpan.FromSeconds(30);
 
         private readonly ISessionManager _sessionManager;
         private readonly ILogger<PlaybackScrobbler> _logger;

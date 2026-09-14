@@ -1,7 +1,7 @@
 ---
 name: "RK Simkl Scrobbler"
 guid: "03A7C840-6154-471F-8BE3-856CDC26D500"
-version: "9.7.2.0"
+version: "9.8.0.0"
 targetAbi: "10.11.7.0"
 framework: "net9.0"
 owner: "romskidd"
@@ -17,10 +17,12 @@ category: "General"
 artifacts:
   - "Jellyfin.Plugin.Simkl.dll"
 changelog: |-
-  - Upgrading from 9.7.0.0 or earlier with the Plugin Pages plugin installed no
-    longer shows the RK Simkl Scrobbler entry twice until the next restart: the
-    old entry is withdrawn from Plugin Pages' list at once, not only from its
-    file.
-  - The plugin description in the catalogue and the README now warn against
-    running this plugin and the official Simkl plugin at the same time, which
-    would scrobble every playback twice.
+  - Anime joins the Simkl sync. The import reads Simkl's anime list with its
+    TVDB season mapping, so an episode Simkl files under a later anime season
+    lands on the right season in Jellyfin; anime films are matched as movies.
+    Anime already on Simkl is no longer offered again by the export, and every
+    history write tells Simkl to read anime seasons the TVDB way.
+  - The position on Simkl keeps up while you watch. The real position is sent
+    again every 5 minutes, and at once after a skip or when watching faster or
+    slower than normal, so the Watching now banner follows what is on screen. A
+    per-profile option, on by default, on both settings pages.
