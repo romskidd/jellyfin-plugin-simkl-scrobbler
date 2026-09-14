@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.Loader;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
@@ -22,6 +24,10 @@ namespace Jellyfin.Plugin.Simkl.Services
     /// next to the built-in entry as a duplicate. Only the entry with this
     /// plugin's id is removed; everything else in that file is left untouched,
     /// and nothing happens at all when Plugin Pages is not installed.
+    /// Plugin Pages reads that file when it loads, before this runs, so the
+    /// entry is also withdrawn from its in-memory list through the same static
+    /// method other plugins use to register pages: the duplicate is gone at
+    /// once rather than after one more restart.
     /// </remarks>
     public class PluginPagesCleanup : IHostedService
     {
@@ -62,6 +68,15 @@ namespace Jellyfin.Plugin.Simkl.Services
                 _logger.LogDebug(ex, "Could not remove the old Plugin Pages entry");
             }
 
+            try
+            {
+                Withdraw();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Could not withdraw the old entry from Plugin Pages' list");
+            }
+
             return Task.CompletedTask;
         }
 
@@ -69,6 +84,30 @@ namespace Jellyfin.Plugin.Simkl.Services
         public Task StopAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
+        }
+
+        // Plugin Pages exposes a static PluginInterface.RemovePage(string id)
+        // for other plugins, reached by reflection so this plugin never depends
+        // on its assembly. Removing an id that is not registered is a no-op.
+        private void Withdraw()
+        {
+            if (!_pluginManager.Plugins.Any(p => p.Id == _pluginPagesId))
+            {
+                return;
+            }
+
+            var assembly = AssemblyLoadContext.All
+                .SelectMany(c => c.Assemblies)
+                .FirstOrDefault(a => string.Equals(a.GetName().Name, "Jellyfin.Plugin.PluginPages", StringComparison.Ordinal));
+            var method = assembly?.GetType("Jellyfin.Plugin.PluginPages.PluginInterface")?
+                .GetMethod("RemovePage", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string) });
+            if (method == null)
+            {
+                return;
+            }
+
+            method.Invoke(null, new object[] { EntryId });
+            _logger.LogInformation("Withdrew the old entry from Plugin Pages' list for this session");
         }
 
         private void Cleanup()

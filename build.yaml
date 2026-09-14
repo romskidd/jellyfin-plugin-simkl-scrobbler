@@ -1,7 +1,7 @@
 ---
 name: "RK Simkl Scrobbler"
 guid: "03A7C840-6154-471F-8BE3-856CDC26D500"
-version: "9.7.1.0"
+version: "9.7.2.0"
 targetAbi: "10.11.7.0"
 framework: "net9.0"
 owner: "romskidd"
@@ -17,14 +17,10 @@ category: "General"
 artifacts:
   - "Jellyfin.Plugin.Simkl.dll"
 changelog: |-
-  - Every user now finds an "RK Simkl Scrobbler" entry in their own menu,
-    leading to the self-service page where they link their Simkl account and set
-    their options, with nothing else to install. The plugin adds the entry to
-    the web client as the page is served, on Jellyfin 10.11 (side drawer) as on
-    12 (avatar menu), without touching any file on disk. It can be turned off
-    from the admin page.
-  - The optional Plugin Pages integration is retired: the entry it used to
-    register is removed at startup, so the page never shows twice. Plugin Pages
-    and File Transformation are no longer needed for anything.
-  - The self-service page shows a "Back to Jellyfin" link when opened on its
-    own.
+  - Upgrading from 9.7.0.0 or earlier with the Plugin Pages plugin installed no
+    longer shows the RK Simkl Scrobbler entry twice until the next restart: the
+    old entry is withdrawn from Plugin Pages' list at once, not only from its
+    file.
+  - The plugin description in the catalogue and the README now warn against
+    running this plugin and the official Simkl plugin at the same time, which
+    would scrobble every playback twice.
