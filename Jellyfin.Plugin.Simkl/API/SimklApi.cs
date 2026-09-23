@@ -929,6 +929,9 @@ namespace Jellyfin.Plugin.Simkl.API
                     snapshot.ShowsStamp = ReadNestedStamp(rootElement, "tv_shows");
                     snapshot.MoviesStamp = ReadNestedStamp(rootElement, "movies");
                     snapshot.AnimeStamp = ReadNestedStamp(rootElement, "anime");
+                    snapshot.PlaybackStamp = ReadNestedStamp(rootElement, "tv_shows", "playback")
+                        + "|" + ReadNestedStamp(rootElement, "anime", "playback")
+                        + "|" + ReadNestedStamp(rootElement, "movies", "playback");
 
                     if (rootElement.TryGetProperty("settings", out var settings)
                         && settings.ValueKind == JsonValueKind.Object
@@ -974,6 +977,7 @@ namespace Jellyfin.Plugin.Simkl.API
                 ShowsStamp = snapshot.ShowsStamp,
                 MoviesStamp = snapshot.MoviesStamp,
                 AnimeStamp = snapshot.AnimeStamp,
+                PlaybackStamp = snapshot.PlaybackStamp,
             };
         }
 
@@ -1018,11 +1022,39 @@ namespace Jellyfin.Plugin.Simkl.API
             return string.IsNullOrWhiteSpace(body) ? "{}" : body;
         }
 
-        private static string? ReadNestedStamp(JsonElement root, string section)
+        /// <summary>
+        /// Reads the user's paused playbacks on Simkl: one resume point per item,
+        /// as a percentage, kept 7 to 90 days depending on the Simkl plan.
+        /// </summary>
+        /// <param name="userToken">User token.</param>
+        /// <returns>The raw JSON body (an array), or null when the request failed.</returns>
+        public async Task<string?> GetPlaybacksRawAsync(string userToken)
+        {
+            using var options = GetOptions(userToken);
+            options.RequestUri = BuildUri("/sync/playback");
+            options.Method = HttpMethod.Get;
+            var response = await SendThrottledAsync(options, userToken).ConfigureAwait(false);
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                DropToken(userToken);
+                return null;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogDebug("GET /sync/playback returned {Status}", response.StatusCode);
+                return null;
+            }
+
+            var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            return string.IsNullOrWhiteSpace(body) ? "[]" : body;
+        }
+
+        private static string? ReadNestedStamp(JsonElement root, string section, string key = "all")
         {
             return root.TryGetProperty(section, out var element)
                    && element.ValueKind == JsonValueKind.Object
-                   && element.TryGetProperty("all", out var all)
+                   && element.TryGetProperty(key, out var all)
                    && all.ValueKind == JsonValueKind.String
                 ? all.GetString()
                 : null;
@@ -1107,6 +1139,8 @@ namespace Jellyfin.Plugin.Simkl.API
             public string? MoviesStamp { get; set; }
 
             public string? AnimeStamp { get; set; }
+
+            public string? PlaybackStamp { get; set; }
 
             public DateTime CheckedUtc { get; set; }
         }

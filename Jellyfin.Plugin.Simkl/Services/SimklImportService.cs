@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -51,9 +52,16 @@ namespace Jellyfin.Plugin.Simkl.Services
         private const int ExportShowsPerRequest = 25;
         private const int ExportMoviesPerRequest = 100;
 
+        // Simkl keeps a paused playback even at 0%; below this there is nothing to resume.
+        private const double MinResumePercent = 1d;
+
         private static readonly TimeSpan _minInterval = TimeSpan.FromHours(1);
         private static readonly TimeSpan _journalRetention = TimeSpan.FromDays(7);
         private static readonly TimeSpan _playbackDelay = TimeSpan.FromSeconds(20);
+
+        // A resume point closer than this to Jellyfin's own position is left alone:
+        // it is usually Jellyfin's own pause, echoed back by Simkl.
+        private static readonly TimeSpan _resumeMargin = TimeSpan.FromSeconds(30);
         private static readonly string[] _seriesIdKeys = { "Imdb", "Tvdb", "Tmdb" };
         private static readonly string[] _movieIdKeys = { "Imdb", "Tmdb" };
         private static readonly JsonSerializerOptions _stateJson = new JsonSerializerOptions { WriteIndented = true };
@@ -243,6 +251,11 @@ namespace Jellyfin.Plugin.Simkl.Services
                 state.Runs.Remove(run);
                 foreach (var change in run.Changes)
                 {
+                    if (change.Resume)
+                    {
+                        continue;
+                    }
+
                     if (change.NewPlayed)
                     {
                         state.Imported.Remove(change.ItemId);
@@ -482,6 +495,7 @@ namespace Jellyfin.Plugin.Simkl.Services
                 var readShows = true;
                 var readMovies = true;
                 var readAnime = true;
+                var readPlayback = true;
                 string? showsFrom = null;
                 string? moviesFrom = null;
                 string? animeFrom = null;
@@ -490,10 +504,11 @@ namespace Jellyfin.Plugin.Simkl.Services
                     readShows = activity.ShowsStamp != null && !string.Equals(activity.ShowsStamp, config.ImportShowsStamp, StringComparison.Ordinal);
                     readMovies = activity.MoviesStamp != null && !string.Equals(activity.MoviesStamp, config.ImportMoviesStamp, StringComparison.Ordinal);
                     readAnime = activity.AnimeStamp != null && !string.Equals(activity.AnimeStamp, config.ImportAnimeStamp, StringComparison.Ordinal);
+                    readPlayback = activity.PlaybackStamp != null && !string.Equals(activity.PlaybackStamp, config.ImportPlaybackStamp, StringComparison.Ordinal);
                     showsFrom = config.ImportShowsStamp;
                     moviesFrom = config.ImportMoviesStamp;
                     animeFrom = config.ImportAnimeStamp;
-                    if (!readShows && !readMovies && !readAnime)
+                    if (!readShows && !readMovies && !readAnime && !readPlayback)
                     {
                         SimklPlugin.Instance?.SaveConfiguration();
                         report.Message = "Nothing changed on Simkl since the last pass.";
@@ -541,6 +556,23 @@ namespace Jellyfin.Plugin.Simkl.Services
                     {
                         PlanShows(user, config, body, plan, "anime");
                         animeRead = true;
+                    }
+                }
+
+                // Resume points come last, so an item the history marks played in
+                // this very pass never also gets a resume position.
+                var playbackRead = false;
+                if (readPlayback)
+                {
+                    var body = await _simklApi.GetPlaybacksRawAsync(config.UserToken).ConfigureAwait(false);
+                    if (body == null)
+                    {
+                        _logger.LogWarning("Simkl did not return the paused playbacks; this pass leaves resume points out");
+                    }
+                    else
+                    {
+                        PlanResumePoints(user, config, body, plan);
+                        playbackRead = true;
                     }
                 }
 
@@ -592,6 +624,11 @@ namespace Jellyfin.Plugin.Simkl.Services
 
                     foreach (var change in run.Changes)
                     {
+                        if (change.Resume)
+                        {
+                            continue;
+                        }
+
                         if (change.NewPlayed)
                         {
                             state.Imported.Add(change.ItemId);
@@ -643,6 +680,11 @@ namespace Jellyfin.Plugin.Simkl.Services
                 if (activity.AnimeStamp != null && animeRead)
                 {
                     config.ImportAnimeStamp = activity.AnimeStamp;
+                }
+
+                if (activity.PlaybackStamp != null && playbackRead)
+                {
+                    config.ImportPlaybackStamp = activity.PlaybackStamp;
                 }
 
                 if (mode == ImportMode.Initial)
@@ -840,6 +882,122 @@ namespace Jellyfin.Plugin.Simkl.Services
             });
         }
 
+        // Simkl's paused playbacks as Jellyfin resume positions. Only ever forward:
+        // a position Jellyfin already has further, or within the margin (Jellyfin's
+        // own pause, echoed back by Simkl), is left alone, and so is anything
+        // excluded, marked played by this same pass, or watched here after it
+        // was paused on Simkl.
+        private void PlanResumePoints(JellyfinUser user, UserConfig config, string body, ImportPlan plan)
+        {
+            using var document = JsonDocument.Parse(body);
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+            {
+                return;
+            }
+
+            var markedNow = new HashSet<Guid>(plan.Changes.Where(c => c.Play).Select(c => c.Item.Id));
+            var seriesCache = new Dictionary<string, Dictionary<(int, int), BaseItem>?>(StringComparer.Ordinal);
+            foreach (var entry in document.RootElement.EnumerateArray())
+            {
+                if (entry.ValueKind != JsonValueKind.Object
+                    || !entry.TryGetProperty("progress", out var pr)
+                    || !pr.TryGetDouble(out var progress)
+                    || progress < MinResumePercent
+                    || progress >= 100d)
+                {
+                    continue;
+                }
+
+                var pausedAt = ReadDate(entry, "paused_at");
+                BaseItem? item = null;
+                string line;
+                if (entry.TryGetProperty("movie", out var movie) && movie.ValueKind == JsonValueKind.Object)
+                {
+                    var ids = ReadIds(movie, _movieIdKeys);
+                    item = ids.Count == 0 ? null : FindItem(user, BaseItemKind.Movie, ids);
+                    line = ReadTitle(movie);
+                    if (item != null && !config.ScrobbleMovies)
+                    {
+                        continue;
+                    }
+                }
+                else if (entry.TryGetProperty("episode", out var ep) && ep.ValueKind == JsonValueKind.Object
+                         && (entry.TryGetProperty("show", out var show) || entry.TryGetProperty("anime", out show))
+                         && show.ValueKind == JsonValueKind.Object)
+                {
+                    // Anime come with their TVDB numbering, the one Jellyfin uses.
+                    var season = ReadInt(ep, "tvdb_season") ?? ReadInt(ep, "season");
+                    var number = ReadInt(ep, "tvdb_number") ?? ReadInt(ep, "number") ?? ReadInt(ep, "episode");
+                    var title = ReadTitle(show);
+                    line = ItemLine(title, season, number, null);
+                    if (season == null || number == null || !config.ScrobbleShows)
+                    {
+                        continue;
+                    }
+
+                    var ids = ReadIds(show, _seriesIdKeys);
+                    var key = string.Join(",", ids.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => p.Key + "=" + p.Value));
+                    if (!seriesCache.TryGetValue(key, out var episodes))
+                    {
+                        var series = ids.Count == 0 ? null : FindItem(user, BaseItemKind.Series, ids);
+                        episodes = series == null ? null : IndexEpisodes(user, series);
+                        seriesCache[key] = episodes;
+                    }
+
+                    if (episodes != null)
+                    {
+                        episodes.TryGetValue((season.Value, number.Value), out item);
+                    }
+                }
+                else
+                {
+                    continue;
+                }
+
+                if (item == null || markedNow.Contains(item.Id) || _libraryFilter.IsExcluded(config, item.Path))
+                {
+                    continue;
+                }
+
+                var runtime = item.RunTimeTicks;
+                var data = _userDataManager.GetUserData(user, item);
+                if (runtime == null || runtime <= 0 || data == null)
+                {
+                    continue;
+                }
+
+                // A watched item only takes a resume point paused after its last
+                // viewing here: a rewatch in progress elsewhere. Its played mark
+                // stays as it is, as Jellyfin does for a rewatch stopped midway.
+                if (data.Played && (pausedAt == null || (data.LastPlayedDate != null && pausedAt <= data.LastPlayedDate)))
+                {
+                    continue;
+                }
+
+                var target = (long)(runtime.Value * progress / 100d);
+                if (target <= data.PlaybackPositionTicks + _resumeMargin.Ticks)
+                {
+                    continue;
+                }
+
+                plan.Changes.Add(new PlannedChange
+                {
+                    Item = item,
+                    Line = string.Format(CultureInfo.InvariantCulture, "{0} (resume at {1:0}%)", line, progress),
+                    WatchedAt = pausedAt,
+                    IsMovie = item is MediaBrowser.Controller.Entities.Movies.Movie,
+                    ResumeTicks = target,
+                });
+            }
+        }
+
+        private static int? ReadInt(JsonElement element, string property)
+        {
+            return element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var n) && n > 0
+                ? n
+                : null;
+        }
+
         private void PlanMovies(JellyfinUser user, UserConfig config, string body, ImportPlan plan)
         {
             using var document = JsonDocument.Parse(body);
@@ -953,9 +1111,21 @@ namespace Jellyfin.Plugin.Simkl.Services
                     PreviousLastPlayed = data.LastPlayedDate,
                     PreviousPosition = data.PlaybackPositionTicks,
                     NewPlayed = change.Play,
+                    Resume = change.ResumeTicks != null,
                 };
 
-                if (change.Play)
+                if (change.ResumeTicks != null)
+                {
+                    // A resume point only moves the position forward, and dates
+                    // the item as played when Simkl saw it paused, so it shows in
+                    // Continue Watching at the right place.
+                    data.PlaybackPositionTicks = change.ResumeTicks.Value;
+                    if (change.WatchedAt != null && (data.LastPlayedDate == null || change.WatchedAt > data.LastPlayedDate))
+                    {
+                        data.LastPlayedDate = change.WatchedAt;
+                    }
+                }
+                else if (change.Play)
                 {
                     data.Played = true;
                     data.PlayCount++;
@@ -1794,6 +1964,17 @@ namespace Jellyfin.Plugin.Simkl.Services
         {
             foreach (var change in plan.Changes)
             {
+                if (change.ResumeTicks != null)
+                {
+                    report.ResumePoints++;
+                    if (report.Lines.Count < MaxReportLines)
+                    {
+                        report.Lines.Add("» " + change.Line);
+                    }
+
+                    continue;
+                }
+
                 if (!change.Play)
                 {
                     report.Unmarked++;
@@ -1982,6 +2163,7 @@ namespace Jellyfin.Plugin.Simkl.Services
             config.ImportShowsStamp = null;
             config.ImportMoviesStamp = null;
             config.ImportAnimeStamp = null;
+            config.ImportPlaybackStamp = null;
             config.ImportLastCheckUtc = null;
             config.ExportLastReport = null;
             config.ImportLastReport = "This profile is now linked to another Simkl account: the sync starts over from step 1.";
@@ -2113,6 +2295,9 @@ namespace Jellyfin.Plugin.Simkl.Services
             public bool Play { get; set; }
 
             public bool IsMovie { get; set; }
+
+            // Set for a resume point: the position to move to, nothing else changes.
+            public long? ResumeTicks { get; set; }
         }
 
         /// <summary>
@@ -2238,6 +2423,9 @@ namespace Jellyfin.Plugin.Simkl.Services
 
             [JsonPropertyName("newPlayed")]
             public bool NewPlayed { get; set; }
+
+            [JsonPropertyName("resume")]
+            public bool Resume { get; set; }
         }
     }
 }

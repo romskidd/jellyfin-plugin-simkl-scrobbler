@@ -463,7 +463,7 @@
                         <h4>How it works</h4>
 <p>Each step stands on its own: run only step 1 to bring your Simkl history into Jellyfin, only step 2 to send Jellyfin's history to Simkl, or both. Step 3 is optional and only for those who want both sides kept aligned from then on.</p>
                         <ol>
-                <li><strong>Simkl to Jellyfin.</strong> Everything you watched on Simkl gets marked played here, with the original dates. Items you don't have yet are remembered and marked when they arrive after a library scan.</li>
+                <li><strong>Simkl to Jellyfin.</strong> Everything you watched on Simkl gets marked played here, with the original dates, and what you paused elsewhere resumes here at the same point. Items you don't have yet are remembered and marked when they arrive after a library scan.</li>
                 <li><strong>Jellyfin to Simkl.</strong> Everything already marked played here is sent to your Simkl history with its dates. Items that came from step 1 are skipped.</li>
                 <li><strong>Keep in sync.</strong> Once both are done, tick the box. From then on, what you watch on Simkl shows up here (checked after a playback or a library scan, at most once an hour), and what you watch here already reaches Simkl in real time.</li>
                     </ol>
@@ -501,7 +501,7 @@
                 <div class="simkl-grid">
                     <div class="simkl-subcard">
                         <h4>Import from Simkl</h4>
-                        <div class="simkl-subdir">Simkl to Jellyfin: marks here what your Simkl history lists as watched, with the original dates.</div>
+                        <div class="simkl-subdir">Simkl to Jellyfin: marks here what your Simkl history lists as watched, with the original dates, and brings the resume points of what you paused elsewhere.</div>
                         <div class="simkl-muted" id="simklStep1Status">Loading...</div>
                         <label style="margin-top:0.3rem;">
                             <input type="checkbox" id="simklImportUnwatch"/>
@@ -815,6 +815,7 @@
                         tiles.appendChild(sbTile(pick(r, 'MarkedEpisodes') || 0, isPreview ? 'episodes to mark' : 'episodes marked', 't1', sel('+ ', true)));
                         tiles.appendChild(sbTile(pick(r, 'MarkedMovies') || 0, isPreview ? 'movies to mark' : 'movies marked', 't1', sel('+ ', false)));
                         tiles.appendChild(sbTile(pick(r, 'Unmarked') || 0, isPreview ? 'to unmark' : 'unmarked', 't1', sel('- ', null)));
+                        tiles.appendChild(sbTile(pick(r, 'ResumePoints') || 0, isPreview ? 'resume points to bring' : 'resume points brought', 't1', sel('» ', null)));
                         tiles.appendChild(sbTile(pick(r, 'AlreadyPlayed') || 0, 'already played', ''));
                         if (pick(r, 'Excluded') > 0) { tiles.appendChild(sbTile(pick(r, 'Excluded'), 'in excluded libraries', '')); }
                         tiles.appendChild(sbTile((pick(r, 'UnmatchedEpisodes') || 0) + (pick(r, 'UnmatchedMovies') || 0), 'not in the library' + (pick(r, 'UnmatchedShows') > 0 ? ' (' + pick(r, 'UnmatchedShows') + ' unknown shows)' : ''), 'warn'));

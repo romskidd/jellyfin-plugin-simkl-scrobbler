@@ -26,5 +26,11 @@ namespace Jellyfin.Plugin.Simkl.API.Objects
         /// Gets or sets the anime.all stamp.
         /// </summary>
         public string? AnimeStamp { get; set; }
+
+        /// <summary>
+        /// Gets or sets the playback stamps of shows, anime and movies, joined:
+        /// they move whenever a paused playback is saved or cleared on Simkl.
+        /// </summary>
+        public string? PlaybackStamp { get; set; }
     }
 }

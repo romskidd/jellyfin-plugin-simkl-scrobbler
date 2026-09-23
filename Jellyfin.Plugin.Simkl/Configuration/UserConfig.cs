@@ -166,6 +166,11 @@ namespace Jellyfin.Plugin.Simkl.Configuration
         public string? ImportAnimeStamp { get; set; }
 
         /// <summary>
+        /// Gets or sets the playback stamps the last import pass used.
+        /// </summary>
+        public string? ImportPlaybackStamp { get; set; }
+
+        /// <summary>
         /// Gets or sets when Simkl's activity was last checked for the import.
         /// </summary>
         public DateTime? ImportLastCheckUtc { get; set; }

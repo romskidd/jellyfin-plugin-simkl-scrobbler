@@ -74,6 +74,11 @@ namespace Jellyfin.Plugin.Simkl.API.Objects
         public int Excluded { get; set; }
 
         /// <summary>
+        /// Gets or sets the number of resume points brought from Simkl.
+        /// </summary>
+        public int ResumePoints { get; set; }
+
+        /// <summary>
         /// Gets or sets when the pass was applied, when it was.
         /// </summary>
         public DateTime? RunUtc { get; set; }

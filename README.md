@@ -110,6 +110,9 @@ Each profile keeps its own Simkl login and settings.
   items present in your libraries), **2. Jellyfin to Simkl** sends what Jellyfin has
   as played and Simkl doesn't have yet, **3. Keep in sync** then follows the Simkl
   history after each playback and library scan, at most once an hour
+- Resume points follow too: an episode or a film paused past 1% in another
+  Simkl-connected app resumes at the same point in Jellyfin (Simkl keeps them 7 days
+  on a free account, 30 on Pro, 90 on VIP); a position is only ever moved forward
 - Every step shows a preview before anything is written; both directions can be
   undone for 7 days; a pass that would change more than 200 items waits for your
   confirmation; excluded libraries are left alone; anime is covered, its seasons
