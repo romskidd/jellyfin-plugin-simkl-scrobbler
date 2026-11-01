@@ -1,7 +1,7 @@
 ---
 name: "RK Simkl Scrobbler"
 guid: "03A7C840-6154-471F-8BE3-856CDC26D500"
-version: "9.9.0.0"
+version: "9.9.1.0"
 targetAbi: "10.11.7.0"
 framework: "net9.0"
 owner: "romskidd"
@@ -17,12 +17,8 @@ category: "General"
 artifacts:
   - "Jellyfin.Plugin.Simkl.dll"
 changelog: |-
-  - Progress within an episode now syncs from Simkl too. The import reads
-    Simkl's paused playbacks and turns each one into a Jellyfin resume position,
-    dated when it was paused, so it shows in Continue Watching at the right
-    place. Episodes, films and anime (through their TVDB numbering) are covered.
-  - Positions only ever move forward, and one within 30 seconds of Jellyfin's
-    own is left alone. A watched item only takes a resume point paused after its
-    last viewing here, a rewatch in progress, and its played mark is never
-    changed. Resume points show in the preview, count in their own tile, and are
-    undone with the rest of the import.
+  - The menu entry now shows when Jellyfin is reached through a reverse proxy
+    that serves it under another path than its base URL (for example a proxy
+    that strips /jellyfin). The script is now loaded by a relative path, so
+    the browser resolves it against whatever address it used.
+  - Checked on Jellyfin 10.11.11 and 12.4.

@@ -218,9 +218,9 @@ their review. Feedback, bug reports and ideas are welcome in the
 
 ## What's new
 
+- **9.9.1.0** (2026-11-01) — the menu entry shows behind a reverse proxy that changes the server's path; checked on Jellyfin 10.11.11 and 12.4.
 - **9.9.0.0** (2026-09-23) — resume points from Simkl: what you paused elsewhere resumes at the same point in Jellyfin.
 - **9.8.0.0** (2026-09-14) — anime in the Simkl sync (TVDB season mapping); the position on Simkl follows skips and playback speed.
-- **9.7.2.0** (2026-09-14) — no duplicate menu entry when upgrading with Plugin Pages installed; warning against running this plugin and the official one together.
 
 The full history is in [CHANGELOG.md](CHANGELOG.md), and each release has its own notes on the
 [releases page](https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/releases).
