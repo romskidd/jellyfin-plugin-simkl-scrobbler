@@ -70,19 +70,23 @@ namespace Jellyfin.Plugin.Simkl.Services
                 || path.Equals("/web", StringComparison.OrdinalIgnoreCase);
         }
 
-        // An absolute path, base url included: a relative one breaks when the
-        // client is requested as "/web" without a trailing slash.
+        // A path relative to the page, never an absolute one: a reverse proxy may
+        // serve the server under another prefix than its base url (or strip that
+        // base url altogether), and only the browser knows the address it used.
+        // From ".../web/" or ".../web/index.html" the script is one level up;
+        // from ".../web" with no trailing slash it sits next to the page.
         private static string BuildTag(HttpRequest request)
         {
-            var full = request.PathBase.Value + request.Path.Value;
-            var index = full.LastIndexOf("/web", StringComparison.OrdinalIgnoreCase);
-            var prefix = index > 0 ? full.Substring(0, index) : string.Empty;
+            var path = request.Path.Value ?? string.Empty;
+            var relative = path.EndsWith("/web", StringComparison.OrdinalIgnoreCase)
+                ? ScriptPath.Substring(1)
+                : ".." + ScriptPath;
             // The version plus this build's own id: caches in front of the server
             // (browser, proxy, CDN) then never serve a stale script, not even for
             // two builds carrying the same version number.
             var version = SimklPlugin.Instance?.Version?.ToString() ?? "0";
             var build = typeof(WebClientInjection).Assembly.ManifestModule.ModuleVersionId.ToString("N").Substring(0, 8);
-            return "<script src=\"" + prefix + ScriptPath + "?v=" + Uri.EscapeDataString(version + "-" + build) + "\" defer></script>";
+            return "<script src=\"" + relative + "?v=" + Uri.EscapeDataString(version + "-" + build) + "\" defer></script>";
         }
 
         private async Task InvokeAsync(HttpContext context, Func<Task> next)
