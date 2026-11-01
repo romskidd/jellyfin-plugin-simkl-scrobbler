@@ -21,20 +21,27 @@ Simkl account.
 ## Why this one
 
 The official [Simkl plugin](https://github.com/jellyfin/jellyfin-plugin-simkl) is
-maintained and scrobbles in real time since its version 9. This fork exists for what it
-does not cover:
+maintained, and its version 10 (October 2026) caught up on a lot: real-time scrobbling,
+importing your Simkl history, sending your check marks to Simkl, rewatches and filename
+matching. This fork still covers what it doesn't:
 
-- **Users link their own Simkl account themselves.** The official plugin already keeps a
+- **Users link their own Simkl account themselves.** The official plugin keeps a
   separate Simkl login per Jellyfin profile, but only an administrator can set each one up
   from the dashboard. Here every user has an **RK Simkl Scrobbler** entry in their own
   menu and links their own account from there, with their own settings — no dashboard
   access, nothing else to install.
-- **The history syncs both ways.** Bring a Simkl history into a fresh Jellyfin library,
-  send what Jellyfin already knows to Simkl, or keep the two aligned from then on — with
-  a preview before every write and a 7-day undo. *(Requested upstream in
-  [#22](https://github.com/jellyfin/jellyfin-plugin-simkl/issues/22) and
+- **What you already watched in Jellyfin goes to Simkl in one pass.** The official plugin
+  sends a check mark when you tick it, but nothing played before that. Here the sync's
+  second step sends everything Jellyfin has as played and Simkl doesn't have yet.
+  *(Requested upstream in
   [#31](https://github.com/jellyfin/jellyfin-plugin-simkl/issues/31).)*
-- **It runs on Jellyfin 10.11.x and on 12.0.** The official version 9 targets 12.0 only.
+- **Every sync is previewed and can be undone.** You see what will change before
+  anything is written, both directions can be undone for 7 days, and a pass that would
+  change more than 200 items waits for your confirmation.
+- **Resume points come across.** An episode or a film paused in another Simkl-connected
+  app resumes at the same point in Jellyfin.
+- **It runs on Jellyfin 10.11.x and on 12.** The official version 10 needs Jellyfin 12.2
+  or newer.
 
 Plus rewatch sessions, per-user library exclusions, and a Logs tab that builds a
 diagnostic report with no tokens in it.
