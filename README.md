@@ -2,7 +2,7 @@
 <p align="center">
   <a href="https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/romskidd/jellyfin-plugin-simkl-scrobbler?label=release"></a>
   <a href="https://github.com/romskidd/jellyfin-plugin-simkl-scrobbler/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/romskidd/jellyfin-plugin-simkl-scrobbler/total"></a>
-  <img alt="Jellyfin 10.11 and 12" src="https://img.shields.io/badge/Jellyfin-10.11.x%20%26%2012.0-00A4DC">
+  <img alt="Jellyfin 10.11 and 12 (tested up to 12.4)" src="https://img.shields.io/badge/Jellyfin-10.11.x%20%26%2012.0%E2%80%9312.4-00A4DC">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-blue"></a>
 </p>
 <p align="center"><em>Unofficial plugin, not affiliated with or endorsed by Simkl or Jellyfin. Simkl and Jellyfin are trademarks of their respective owners; this is an independent community project.</em></p>
@@ -40,8 +40,8 @@ matching. This fork still covers what it doesn't:
   change more than 200 items waits for your confirmation.
 - **Resume points come across.** An episode or a film paused in another Simkl-connected
   app resumes at the same point in Jellyfin.
-- **It runs on Jellyfin 10.11.x and on 12.** The official version 10 needs Jellyfin 12.2
-  or newer.
+- **It runs on Jellyfin 10.11.x and on every 12 release so far (12.0 to 12.4).** The
+  official version 10 needs Jellyfin 12.2 or newer.
 
 Plus rewatch sessions, per-user library exclusions, and a Logs tab that builds a
 diagnostic report with no tokens in it.
@@ -75,7 +75,7 @@ https://raw.githubusercontent.com/romskidd/jellyfin-plugin-simkl-scrobbler/maste
 The beta channel currently carries the same build as the stable one; it is where the
 next round of changes will appear first.
 
-Runs on Jellyfin 10.11.x and on Jellyfin 12. A free Simkl account is enough; rewatch tracking needs
+Runs on Jellyfin 10.11.x and on Jellyfin 12, tested on 10.11.11 and 12.4 (November 2026). A free Simkl account is enough; rewatch tracking needs
 Simkl Pro or VIP, as Simkl only offers it there.
 
 ## Linking a Simkl account
